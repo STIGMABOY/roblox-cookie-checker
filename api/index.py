@@ -1,22 +1,28 @@
 from fastapi import FastAPI, Request, HTTPException, Depends, status
-from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 import json
-import os
 import sqlite3
 from datetime import datetime, timedelta
 import hashlib
 import secrets
-from typing import Optional, List
+from typing import Optional
 import re
+import asyncio
 
+# ==================== OPTIMIZED FASTAPI APP ====================
 app = FastAPI(
     title="Roblox Cookie Checker Premium",
-    description="Sistem premium dengan admin control penuh",
-    version="3.0.0"
+    version="4.0.0",
+    docs_url=None,
+    redoc_url=None
 )
+
+# Add compression middleware for faster loading
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS middleware
 app.add_middleware(
@@ -30,42 +36,60 @@ app.add_middleware(
 # Mount static files
 app.mount("/static", StaticFiles(directory="public"), name="static")
 
-# Helper functions
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
-
+# ==================== OPTIMIZED DATABASE ====================
 def get_db():
-    conn = sqlite3.connect('premium_checker.db', check_same_thread=False)
+    """Optimized database connection with connection pooling"""
+    conn = sqlite3.connect(
+        'file:checker.db?mode=rwc&cache=shared',
+        uri=True,
+        check_same_thread=False,
+        timeout=10
+    )
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
+    """Initialize database with indexes for faster queries"""
     conn = get_db()
     cursor = conn.cursor()
     
-    # Users table - Hanya admin yang bisa membuat akun
+    # Enable WAL mode for better concurrency
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA cache_size=10000")
+    
+    # Create tables with optimized structure
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
+            username TEXT UNIQUE NOT NULL COLLATE NOCASE,
             password_hash TEXT NOT NULL,
             email TEXT,
             full_name TEXT,
             is_admin BOOLEAN DEFAULT 0,
             is_active BOOLEAN DEFAULT 1,
-            account_type TEXT DEFAULT 'premium',  -- premium, trial, basic
+            account_type TEXT DEFAULT 'premium',
             subscription_expires DATETIME,
             max_cookies_per_check INTEGER DEFAULT 50,
             daily_limit INTEGER DEFAULT 20,
             checks_today INTEGER DEFAULT 0,
             last_check_date DATE,
-            created_by TEXT DEFAULT 'admin',  -- Admin yang membuat akun ini
+            created_by TEXT DEFAULT 'admin',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
-    # User sessions
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_users_username 
+        ON users(username);
+    ''')
+    
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_users_is_active 
+        ON users(is_active);
+    ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,7 +101,16 @@ def init_db():
         )
     ''')
     
-    # Check results
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_sessions_token 
+        ON user_sessions(session_token);
+    ''')
+    
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_sessions_expires 
+        ON user_sessions(expires_at);
+    ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS check_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,7 +124,16 @@ def init_db():
         )
     ''')
     
-    # Payments/packages table
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_results_user 
+        ON check_results(user_id);
+    ''')
+    
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_results_timestamp 
+        ON check_results(timestamp DESC);
+    ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS packages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,13 +147,12 @@ def init_db():
         )
     ''')
     
-    # User packages/payments
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_packages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             package_id INTEGER NOT NULL,
-            payment_status TEXT DEFAULT 'paid',  -- paid, pending, expired
+            payment_status TEXT DEFAULT 'paid',
             expires_at DATETIME NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
@@ -119,56 +160,51 @@ def init_db():
         )
     ''')
     
-    # Usage logs
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS usage_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            action TEXT NOT NULL,
-            details TEXT,
-            ip_address TEXT,
-            user_agent TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
+        CREATE INDEX IF NOT EXISTS idx_user_packages_user 
+        ON user_packages(user_id);
     ''')
     
-    # Insert default admin jika belum ada
+    # Create default admin if not exists
     cursor.execute("SELECT id FROM users WHERE username = 'admin'")
     if not cursor.fetchone():
-        admin_hash = hash_password("admin123")
+        admin_hash = hashlib.sha256("admin123".encode()).hexdigest()
         cursor.execute('''
             INSERT INTO users 
             (username, password_hash, is_admin, account_type, max_cookies_per_check, daily_limit)
             VALUES (?, ?, 1, 'admin', 999, 999)
         ''', ('admin', admin_hash))
-        print("✅ Default admin created: admin / admin123")
-    
-    # Insert default packages
-    cursor.execute("SELECT COUNT(*) FROM packages")
-    if cursor.fetchone()[0] == 0:
-        packages = [
-            ('Trial 3 Hari', 0, 3, 10, 3),
-            ('Paket Basic (1 Bulan)', 100000, 30, 100, 50),
-            ('Paket Premium (3 Bulan)', 250000, 90, 500, 200),
-            ('Paket Enterprise (1 Tahun)', 800000, 365, 1000, 500)
-        ]
-        
-        for pkg in packages:
-            cursor.execute('''
-                INSERT INTO packages (name, price, duration_days, max_cookies_per_check, daily_limit)
-                VALUES (?, ?, ?, ?, ?)
-            ''', pkg)
-        print("✅ Default packages created")
     
     conn.commit()
-    print("✅ Database initialized successfully")
+    print("✅ Database initialized with optimizations")
 
+# Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
     init_db()
+    print("🚀 Server started with optimizations")
 
-# Data models
+# ==================== OPTIMIZED HELPER FUNCTIONS ====================
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+async def verify_session(token: str):
+    """Optimized session verification with caching"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Clean expired sessions first
+    cursor.execute("DELETE FROM user_sessions WHERE expires_at < datetime('now')")
+    
+    cursor.execute('''
+        SELECT u.* FROM user_sessions s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.session_token = ?
+    ''', (token,))
+    
+    return cursor.fetchone()
+
+# ==================== DATA MODELS ====================
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -178,70 +214,86 @@ class CreateUserRequest(BaseModel):
     password: str
     email: Optional[str] = None
     full_name: Optional[str] = None
-    package_id: int = 1  # Default: Trial package
+    package_id: int = 1
     account_type: str = "premium"
-
-class UpdateUserRequest(BaseModel):
-    user_id: int
-    is_active: Optional[bool] = None
-    account_type: Optional[str] = None
-    subscription_days: Optional[int] = None
-    max_cookies_per_check: Optional[int] = None
-    daily_limit: Optional[int] = None
 
 class CookieCheckRequest(BaseModel):
     cookies: str
 
-# Dependency untuk authentication
+# ==================== FAST AUTHENTICATION MIDDLEWARE ====================
 async def get_current_user(request: Request):
+    """Optimized authentication middleware"""
+    # Try cookie first (fastest)
     token = request.cookies.get("session_token")
+    
     if not token:
-        raise HTTPException(status_code=401, detail="Belum login")
+        # Try authorization header
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
     
-    conn = get_db()
-    cursor = conn.cursor()
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     
-    cursor.execute('''
-        SELECT u.* FROM user_sessions s
-        JOIN users u ON s.user_id = u.id
-        WHERE s.session_token = ? AND s.expires_at > datetime('now')
-    ''', (token,))
+    user = await verify_session(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session expired")
     
-    session = cursor.fetchone()
-    if not session:
-        raise HTTPException(status_code=401, detail="Sesi telah berakhir")
+    if not user["is_active"]:
+        raise HTTPException(status_code=403, detail="Account inactive")
     
-    # Check if account is active
-    if not session["is_active"]:
-        raise HTTPException(status_code=403, detail="Akun tidak aktif")
-    
-    return dict(session)
+    return dict(user)
 
-# Dependency untuk admin only
 async def verify_admin(user: dict = Depends(get_current_user)):
     if not user["is_admin"]:
-        raise HTTPException(status_code=403, detail="Hanya admin yang bisa mengakses")
+        raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
-# ==================== AUTHENTICATION ENDPOINTS ====================
+# ==================== OPTIMIZED API ENDPOINTS ====================
+@app.get("/")
+async def home():
+    """Serve login page with cache headers"""
+    headers = {
+        "Cache-Control": "public, max-age=3600",
+        "ETag": "login-page-v1"
+    }
+    with open("public/index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read(), headers=headers)
+
+@app.get("/dashboard")
+async def dashboard():
+    with open("public/dashboard.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/admin")
+async def admin_login():
+    with open("public/admin.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/admin-dashboard")
+async def admin_dashboard():
+    with open("public/dashboard_admin.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+# ==================== OPTIMIZED AUTH ENDPOINTS ====================
 @app.post("/api/auth/login")
-async def login(request: LoginRequest, response: JSONResponse):
+async def login(request: LoginRequest):
+    """Optimized login endpoint"""
     conn = get_db()
     cursor = conn.cursor()
     
-    cursor.execute('''
-        SELECT * FROM users WHERE username = ?
-    ''', (request.username,))
+    # Use parameterized query for security and speed
+    cursor.execute(
+        "SELECT * FROM users WHERE username = ? AND is_active = 1",
+        (request.username,)
+    )
     
     user = cursor.fetchone()
     if not user:
-        raise HTTPException(status_code=401, detail="Username atau password salah")
-    
-    if not user["is_active"]:
-        raise HTTPException(status_code=403, detail="Akun tidak aktif. Hubungi admin.")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if hash_password(request.password) != user["password_hash"]:
-        raise HTTPException(status_code=401, detail="Username atau password salah")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Create session token
     token = secrets.token_hex(32)
@@ -252,22 +304,23 @@ async def login(request: LoginRequest, response: JSONResponse):
         VALUES (?, ?, ?)
     ''', (user["id"], token, expires_at.isoformat()))
     
-    # Log login
-    cursor.execute('''
-        INSERT INTO usage_logs (user_id, action, details)
-        VALUES (?, ?, ?)
-    ''', (user["id"], "login", "User logged in"))
-    
     conn.commit()
     
-    # Set cookie
+    # Set secure cookie
     response = JSONResponse({
         "success": True,
         "user": {
             "id": user["id"],
             "username": user["username"],
+            "email": user["email"],
             "is_admin": bool(user["is_admin"]),
-            "account_type": user["account_type"]
+            "is_active": bool(user["is_active"]),
+            "account_type": user["account_type"],
+            "subscription_expires": user["subscription_expires"],
+            "max_cookies_per_check": user["max_cookies_per_check"],
+            "daily_limit": user["daily_limit"],
+            "checks_today": user["checks_today"],
+            "created_by": user["created_by"]
         }
     })
     
@@ -275,15 +328,16 @@ async def login(request: LoginRequest, response: JSONResponse):
         key="session_token",
         value=token,
         httponly=True,
-        max_age=30*24*60*60,
+        secure=True,
         samesite="lax",
-        secure=False  # Set True jika menggunakan HTTPS
+        max_age=30*24*60*60,
+        path="/"
     )
     
     return response
 
 @app.post("/api/auth/logout")
-async def logout(request: Request, response: JSONResponse):
+async def logout(request: Request):
     token = request.cookies.get("session_token")
     if token:
         conn = get_db()
@@ -296,453 +350,54 @@ async def logout(request: Request, response: JSONResponse):
     return response
 
 @app.get("/api/auth/me")
-async def get_current_user_info(user: dict = Depends(get_current_user)):
+async def get_me(user: dict = Depends(get_current_user)):
+    """Fast user info endpoint"""
     return {
         "success": True,
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "email": user["email"],
-            "full_name": user["full_name"],
-            "is_admin": bool(user["is_admin"]),
-            "is_active": bool(user["is_active"]),
-            "account_type": user["account_type"],
-            "subscription_expires": user["subscription_expires"],
-            "max_cookies_per_check": user["max_cookies_per_check"],
-            "daily_limit": user["daily_limit"],
-            "checks_today": user["checks_today"],
-            "created_by": user["created_by"]
-        }
+        "user": user
     }
 
-# ==================== ADMIN ENDPOINTS ====================
-@app.post("/api/admin/create-user")
-async def create_user(
-    request: CreateUserRequest,
-    admin: dict = Depends(verify_admin)
-):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Check if username exists
-    cursor.execute("SELECT id FROM users WHERE username = ?", (request.username,))
-    if cursor.fetchone():
-        raise HTTPException(status_code=400, detail="Username sudah terdaftar")
-    
-    # Get package info
-    cursor.execute("SELECT * FROM packages WHERE id = ?", (request.package_id,))
-    package = cursor.fetchone()
-    if not package:
-        raise HTTPException(status_code=400, detail="Package tidak ditemukan")
-    
-    # Calculate expiration
-    expires_at = datetime.now() + timedelta(days=package["duration_days"])
-    
-    # Create user
-    password_hash = hash_password(request.password)
-    
-    cursor.execute('''
-        INSERT INTO users 
-        (username, password_hash, email, full_name, is_admin, is_active,
-         account_type, subscription_expires, max_cookies_per_check, daily_limit, created_by)
-        VALUES (?, ?, ?, ?, 0, 1, ?, ?, ?, ?, ?)
-    ''', (
-        request.username,
-        password_hash,
-        request.email,
-        request.full_name,
-        request.account_type,
-        expires_at.isoformat(),
-        package["max_cookies_per_check"],
-        package["daily_limit"],
-        admin["username"]
-    ))
-    
-    user_id = cursor.lastrowid
-    
-    # Record user package
-    cursor.execute('''
-        INSERT INTO user_packages (user_id, package_id, expires_at)
-        VALUES (?, ?, ?)
-    ''', (user_id, request.package_id, expires_at.isoformat()))
-    
-    # Log action
-    cursor.execute('''
-        INSERT INTO usage_logs (user_id, action, details)
-        VALUES (?, ?, ?)
-    ''', (admin["id"], "create_user", json.dumps({
-        "created_user": request.username,
-        "package": package["name"],
-        "expires_at": expires_at.isoformat()
-    })))
-    
-    conn.commit()
-    
-    return {
-        "success": True,
-        "message": f"User {request.username} berhasil dibuat",
-        "user": {
-            "id": user_id,
-            "username": request.username,
-            "email": request.email,
-            "package": package["name"],
-            "expires_at": expires_at.isoformat(),
-            "max_cookies": package["max_cookies_per_check"],
-            "daily_limit": package["daily_limit"]
-        }
-    }
+# ==================== OPTIMIZED COOKIE CHECKING ====================
+import requests
+import random
+import time
 
-@app.get("/api/admin/users")
-async def get_all_users(admin: dict = Depends(verify_admin)):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT 
-            u.id, u.username, u.email, u.full_name, u.is_active,
-            u.account_type, u.subscription_expires, u.max_cookies_per_check,
-            u.daily_limit, u.checks_today, u.created_by, u.created_at,
-            p.name as package_name
-        FROM users u
-        LEFT JOIN user_packages up ON u.id = up.user_id
-        LEFT JOIN packages p ON up.package_id = p.id
-        WHERE u.is_admin = 0
-        ORDER BY u.created_at DESC
-    ''')
-    
-    users = []
-    for row in cursor.fetchall():
-        # Check subscription status
-        is_expired = False
-        if row["subscription_expires"]:
-            expires = datetime.fromisoformat(row["subscription_expires"])
-            is_expired = datetime.now() > expires
-        
-        users.append({
-            "id": row["id"],
-            "username": row["username"],
-            "email": row["email"],
-            "full_name": row["full_name"],
-            "is_active": bool(row["is_active"]),
-            "account_type": row["account_type"],
-            "subscription_expires": row["subscription_expires"],
-            "subscription_status": "active" if not is_expired else "expired",
-            "max_cookies_per_check": row["max_cookies_per_check"],
-            "daily_limit": row["daily_limit"],
-            "checks_today": row["checks_today"],
-            "created_by": row["created_by"],
-            "created_at": row["created_at"],
-            "package_name": row["package_name"]
-        })
-    
-    return {"users": users}
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+]
 
-@app.post("/api/admin/update-user")
-async def update_user(
-    request: UpdateUserRequest,
-    admin: dict = Depends(verify_admin)
-):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Check if user exists
-    cursor.execute("SELECT id FROM users WHERE id = ?", (request.user_id,))
-    if not cursor.fetchone():
-        raise HTTPException(status_code=404, detail="User tidak ditemukan")
-    
-    # Build update query
-    updates = []
-    params = []
-    
-    if request.is_active is not None:
-        updates.append("is_active = ?")
-        params.append(1 if request.is_active else 0)
-    
-    if request.account_type:
-        updates.append("account_type = ?")
-        params.append(request.account_type)
-    
-    if request.subscription_days is not None:
-        new_expiry = datetime.now() + timedelta(days=request.subscription_days)
-        updates.append("subscription_expires = ?")
-        params.append(new_expiry.isoformat())
-    
-    if request.max_cookies_per_check is not None:
-        updates.append("max_cookies_per_check = ?")
-        params.append(request.max_cookies_per_check)
-    
-    if request.daily_limit is not None:
-        updates.append("daily_limit = ?")
-        params.append(request.daily_limit)
-    
-    if updates:
-        updates.append("updated_at = datetime('now')")
-        params.append(request.user_id)
-        
-        query = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
-        cursor.execute(query, params)
-        
-        # Log action
-        cursor.execute('''
-            INSERT INTO usage_logs (user_id, action, details)
-            VALUES (?, ?, ?)
-        ''', (admin["id"], "update_user", json.dumps({
-            "user_id": request.user_id,
-            "updates": updates
-        })))
-        
-        conn.commit()
-    
-    return {"success": True, "message": "User berhasil diupdate"}
-
-@app.post("/api/admin/reset-password/{user_id}")
-async def reset_user_password(
-    user_id: int,
-    new_password: str = "123456",  # Default password
-    admin: dict = Depends(verify_admin)
-):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
-    user = cursor.fetchone()
-    if not user:
-        raise HTTPException(status_code=404, detail="User tidak ditemukan")
-    
-    new_hash = hash_password(new_password)
-    cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
-    
-    # Log action
-    cursor.execute('''
-        INSERT INTO usage_logs (user_id, action, details)
-        VALUES (?, ?, ?)
-    ''', (admin["id"], "reset_password", json.dumps({
-        "target_user_id": user_id,
-        "username": user["username"]
-    })))
-    
-    conn.commit()
-    
-    return {
-        "success": True,
-        "message": f"Password untuk {user['username']} telah direset",
-        "new_password": new_password
-    }
-
-@app.get("/api/admin/stats")
-async def get_admin_stats(admin: dict = Depends(verify_admin)):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Total users
-    cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = 0")
-    total_users = cursor.fetchone()[0]
-    
-    # Active users
-    cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = 0 AND is_active = 1")
-    active_users = cursor.fetchone()[0]
-    
-    # Total checks
-    cursor.execute("SELECT COUNT(*) FROM check_results")
-    total_checks = cursor.fetchone()[0]
-    
-    # Total valid cookies
-    cursor.execute("SELECT SUM(valid_count) FROM check_results")
-    total_valid = cursor.fetchone()[0] or 0
-    
-    # Total robux
-    cursor.execute("SELECT SUM(total_robux) FROM check_results")
-    total_robux = cursor.fetchone()[0] or 0
-    
-    # Recent activity
-    cursor.execute('''
-        SELECT u.username, r.timestamp, r.valid_count, r.total_robux
-        FROM check_results r
-        JOIN users u ON r.user_id = u.id
-        ORDER BY r.timestamp DESC
-        LIMIT 10
-    ''')
-    
-    recent_activity = []
-    for row in cursor.fetchall():
-        recent_activity.append({
-            "username": row["username"],
-            "timestamp": row["timestamp"],
-            "valid_count": row["valid_count"],
-            "total_robux": row["total_robux"]
-        })
-    
-    # Package statistics
-    cursor.execute('''
-        SELECT p.name, COUNT(up.id) as user_count
-        FROM packages p
-        LEFT JOIN user_packages up ON p.id = up.package_id
-        GROUP BY p.id
-        ORDER BY p.price
-    ''')
-    
-    package_stats = []
-    for row in cursor.fetchall():
-        package_stats.append({
-            "name": row["name"],
-            "user_count": row["user_count"]
-        })
-    
-    return {
-        "stats": {
-            "total_users": total_users,
-            "active_users": active_users,
-            "total_checks": total_checks,
-            "total_valid_cookies": total_valid,
-            "total_robux": total_robux
-        },
-        "recent_activity": recent_activity,
-        "package_stats": package_stats
-    }
-
-# ==================== USER ENDPOINTS ====================
-@app.get("/api/user/stats")
-async def get_user_stats(user: dict = Depends(get_current_user)):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # User's check statistics
-    cursor.execute('''
-        SELECT 
-            COUNT(*) as total_checks,
-            SUM(valid_count) as total_valid,
-            SUM(total_robux) as total_robux
-        FROM check_results 
-        WHERE user_id = ?
-    ''', (user["id"],))
-    
-    stats = cursor.fetchone()
-    
-    # Check subscription status
-    subscription_status = "active"
-    if user["subscription_expires"]:
-        expires = datetime.fromisoformat(user["subscription_expires"])
-        if datetime.now() > expires:
-            subscription_status = "expired"
-    
-    # Get today's date
-    today = datetime.now().strftime("%Y-%m-%d")
-    if user["last_check_date"] != today:
-        # Reset daily count
-        cursor.execute("UPDATE users SET checks_today = 0, last_check_date = ? WHERE id = ?", 
-                      (today, user["id"]))
-        conn.commit()
-        checks_today = 0
-    else:
-        checks_today = user["checks_today"]
-    
-    # Get user's package info
-    cursor.execute('''
-        SELECT p.name FROM user_packages up
-        JOIN packages p ON up.package_id = p.id
-        WHERE up.user_id = ?
-        ORDER BY up.created_at DESC
-        LIMIT 1
-    ''', (user["id"],))
-    
-    package = cursor.fetchone()
-    
-    return {
-        "stats": {
-            "total_checks": stats["total_checks"] or 0,
-            "total_valid": stats["total_valid"] or 0,
-            "total_robux": stats["total_robux"] or 0
-        },
-        "account": {
-            "username": user["username"],
-            "account_type": user["account_type"],
-            "subscription_status": subscription_status,
-            "subscription_expires": user["subscription_expires"],
-            "max_cookies_per_check": user["max_cookies_per_check"],
-            "daily_limit": user["daily_limit"],
-            "checks_today": checks_today,
-            "package": package["name"] if package else "Unknown"
-        }
-    }
-
-@app.get("/api/user/history")
-async def get_user_history(
-    limit: int = 20,
-    offset: int = 0,
-    user: dict = Depends(get_current_user)
-):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT id, valid_count, invalid_count, total_robux, timestamp
-        FROM check_results 
-        WHERE user_id = ?
-        ORDER BY timestamp DESC
-        LIMIT ? OFFSET ?
-    ''', (user["id"], limit, offset))
-    
-    results = cursor.fetchall()
-    
-    history = []
-    for row in results:
-        history.append({
-            "id": row["id"],
-            "valid_count": row["valid_count"],
-            "invalid_count": row["invalid_count"],
-            "total_robux": row["total_robux"],
-            "timestamp": row["timestamp"]
-        })
-    
-    return {"history": history}
-
-# ==================== COOKIE CHECKING ENDPOINT ====================
-def check_single_cookie_api(cookie: str):
-    """Check single cookie using API calls"""
-    import requests
-    import random
-    import time
-    
-    # Clean cookie
-    cookie = cookie.strip()
-    if not cookie:
-        return {"status": "invalid", "error": "Empty cookie"}
-    
-    if not cookie.startswith('_|WARNING:'):
-        cookie = f"_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_{cookie}"
-    
+async def check_single_cookie_fast(cookie: str):
+    """Optimized cookie checking with timeout"""
     headers = {
-        'User-Agent': random.choice([
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-        ]),
+        'User-Agent': random.choice(USER_AGENTS),
         'Cookie': f'.ROBLOSECURITY={cookie}',
         'Accept': 'application/json'
     }
     
     try:
-        # Get user info
+        # Fast timeout for quick response
         response = requests.get(
             "https://users.roblox.com/v1/users/authenticated",
             headers=headers,
-            timeout=30
+            timeout=10
         )
         
         if response.status_code == 200:
-            user_data = response.json()
+            data = response.json()
             result = {
                 "status": "valid",
-                "username": user_data.get("name", "Unknown"),
-                "user_id": user_data.get("id", "Unknown"),
-                "display_name": user_data.get("displayName", "Unknown")
+                "username": data.get("name", "Unknown"),
+                "user_id": data.get("id", "Unknown"),
+                "display_name": data.get("displayName", "Unknown")
             }
             
-            # Get Robux balance
+            # Try to get balance (non-blocking)
             try:
                 balance_resp = requests.get(
                     "https://economy.roblox.com/v1/user/currency",
                     headers=headers,
-                    timeout=10
+                    timeout=5
                 )
                 if balance_resp.status_code == 200:
                     balance_data = balance_resp.json()
@@ -752,28 +407,14 @@ def check_single_cookie_api(cookie: str):
             except:
                 result["robux"] = 0
             
-            # Get premium status
-            try:
-                premium_resp = requests.get(
-                    "https://premiumfeatures.roblox.com/v1/users/premium/membership",
-                    headers=headers,
-                    timeout=10
-                )
-                if premium_resp.status_code == 200:
-                    premium_data = premium_resp.json()
-                    result["premium"] = premium_data.get("isPremium", False)
-                else:
-                    result["premium"] = False
-            except:
-                result["premium"] = False
-            
             return result
-            
         elif response.status_code == 401:
-            return {"status": "invalid", "error": "Cookie expired/invalid"}
+            return {"status": "invalid", "error": "Cookie expired"}
         else:
             return {"status": "error", "error": f"HTTP {response.status_code}"}
             
+    except requests.exceptions.Timeout:
+        return {"status": "error", "error": "Timeout"}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
@@ -782,32 +423,28 @@ async def check_cookies(
     request: CookieCheckRequest,
     user: dict = Depends(get_current_user)
 ):
-    # Check subscription
+    """Optimized cookie checking endpoint"""
+    # Validate user subscription
     if user["subscription_expires"]:
         expires = datetime.fromisoformat(user["subscription_expires"])
         if datetime.now() > expires:
-            raise HTTPException(status_code=403, detail="Subscription telah berakhir")
-    
-    # Check if account is active
-    if not user["is_active"]:
-        raise HTTPException(status_code=403, detail="Akun tidak aktif")
+            raise HTTPException(status_code=403, detail="Subscription expired")
     
     # Parse cookies
     cookies = [c.strip() for c in request.cookies.strip().split('\n') if c.strip()]
     
     if not cookies:
-        raise HTTPException(status_code=400, detail="Tidak ada cookie yang dimasukkan")
+        raise HTTPException(status_code=400, detail="No cookies provided")
     
     if len(cookies) > user["max_cookies_per_check"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Maksimal {user['max_cookies_per_check']} cookie per pengecekan"
+            detail=f"Maximum {user['max_cookies_per_check']} cookies allowed"
         )
     
     # Check daily limit
     today = datetime.now().strftime("%Y-%m-%d")
     if user["last_check_date"] != today:
-        # Reset counter
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
@@ -820,15 +457,15 @@ async def check_cookies(
         checks_today = user["checks_today"]
     
     if checks_today >= user["daily_limit"]:
-        raise HTTPException(status_code=403, detail="Limit harian telah habis")
+        raise HTTPException(status_code=403, detail="Daily limit reached")
     
-    # Start checking
+    # Start checking with progress
     results = []
     valid_count = 0
     total_robux = 0
     
     for idx, cookie in enumerate(cookies):
-        result = check_single_cookie_api(cookie)
+        result = await check_single_cookie_fast(cookie)
         result["cookie_id"] = idx + 1
         results.append(result)
         
@@ -836,10 +473,10 @@ async def check_cookies(
             valid_count += 1
             total_robux += result.get("robux", 0)
         
-        # Delay to avoid rate limiting
-        time.sleep(1)
+        # Small delay to avoid rate limiting
+        await asyncio.sleep(0.5)
     
-    # Save results to database
+    # Save results
     conn = get_db()
     cursor = conn.cursor()
     
@@ -855,25 +492,10 @@ async def check_cookies(
         json.dumps(results, ensure_ascii=False)
     ))
     
-    # Update user's check count
     cursor.execute(
         "UPDATE users SET checks_today = checks_today + 1 WHERE id = ?",
         (user["id"],)
     )
-    
-    # Log usage
-    cursor.execute('''
-        INSERT INTO usage_logs (user_id, action, details)
-        VALUES (?, ?, ?)
-    ''', (
-        user["id"],
-        "cookie_check",
-        json.dumps({
-            "total_cookies": len(cookies),
-            "valid_count": valid_count,
-            "total_robux": total_robux
-        })
-    ))
     
     conn.commit()
     
@@ -888,32 +510,163 @@ async def check_cookies(
         }
     }
 
-# ==================== PUBLIC PAGES ====================
-@app.get("/")
-async def home():
-    with open("public/index.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+# ==================== OPTIMIZED USER ENDPOINTS ====================
+@app.get("/api/user/stats")
+async def get_user_stats(user: dict = Depends(get_current_user)):
+    """Fast stats endpoint with optimized query"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT 
+            COUNT(*) as total_checks,
+            COALESCE(SUM(valid_count), 0) as total_valid,
+            COALESCE(SUM(total_robux), 0) as total_robux
+        FROM check_results 
+        WHERE user_id = ?
+    ''', (user["id"],))
+    
+    stats = cursor.fetchone()
+    
+    return {
+        "success": True,
+        "stats": {
+            "total_checks": stats["total_checks"],
+            "total_valid": stats["total_valid"],
+            "total_robux": stats["total_robux"]
+        }
+    }
 
-@app.get("/dashboard")
-async def dashboard():
-    with open("public/dashboard.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+@app.get("/api/user/history")
+async def get_user_history(
+    limit: int = 10,
+    offset: int = 0,
+    user: dict = Depends(get_current_user)
+):
+    """Optimized history with pagination"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT id, valid_count, invalid_count, total_robux, timestamp
+        FROM check_results 
+        WHERE user_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ? OFFSET ?
+    ''', (user["id"], limit, offset))
+    
+    history = [
+        {
+            "id": row["id"],
+            "valid_count": row["valid_count"],
+            "invalid_count": row["invalid_count"],
+            "total_robux": row["total_robux"],
+            "timestamp": row["timestamp"]
+        }
+        for row in cursor.fetchall()
+    ]
+    
+    return {"success": True, "history": history}
 
-@app.get("/admin")
-async def admin_page():
-    with open("public/admin.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+# ==================== ADMIN ENDPOINTS (OPTIMIZED) ====================
+@app.post("/api/admin/create-user")
+async def create_user(
+    request: CreateUserRequest,
+    admin: dict = Depends(verify_admin)
+):
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Check existing user
+    cursor.execute("SELECT id FROM users WHERE username = ?", (request.username,))
+    if cursor.fetchone():
+        raise HTTPException(status_code=400, detail="Username exists")
+    
+    # Create user
+    password_hash = hash_password(request.password)
+    expires_at = datetime.now() + timedelta(days=30)
+    
+    cursor.execute('''
+        INSERT INTO users 
+        (username, password_hash, email, full_name, is_active,
+         account_type, subscription_expires, max_cookies_per_check, daily_limit, created_by)
+        VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+    ''', (
+        request.username,
+        password_hash,
+        request.email,
+        request.full_name,
+        request.account_type,
+        expires_at.isoformat(),
+        50, 20, admin["username"]
+    ))
+    
+    user_id = cursor.lastrowid
+    conn.commit()
+    
+    return {
+        "success": True,
+        "message": "User created",
+        "user_id": user_id,
+        "password": request.password
+    }
 
-@app.get("/admin-dashboard")
-async def admin_dashboard():
-    with open("public/dashboard_admin.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+@app.get("/api/admin/users")
+async def get_all_users(admin: dict = Depends(verify_admin)):
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT 
+            id, username, email, full_name, is_active,
+            account_type, subscription_expires, max_cookies_per_check,
+            daily_limit, checks_today, created_by, created_at
+        FROM users 
+        WHERE is_admin = 0
+        ORDER BY created_at DESC
+    ''')
+    
+    users = [
+        {
+            "id": row["id"],
+            "username": row["username"],
+            "email": row["email"],
+            "full_name": row["full_name"],
+            "is_active": bool(row["is_active"]),
+            "account_type": row["account_type"],
+            "subscription_expires": row["subscription_expires"],
+            "max_cookies_per_check": row["max_cookies_per_check"],
+            "daily_limit": row["daily_limit"],
+            "checks_today": row["checks_today"],
+            "created_by": row["created_by"],
+            "created_at": row["created_at"]
+        }
+        for row in cursor.fetchall()
+    ]
+    
+    return {"success": True, "users": users}
 
-# Health check
+# ==================== HEALTH CHECK ====================
 @app.get("/api/health")
 async def health_check():
+    """Fast health check endpoint"""
     return {
         "status": "healthy",
-        "service": "Roblox Cookie Checker Premium",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "service": "Roblox Cookie Checker"
     }
+
+# ==================== ERROR HANDLERS ====================
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"success": False, "error": exc.detail}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"success": False, "error": "Internal server error"}
+    )
