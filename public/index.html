@@ -3,24 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roblox Cookie Checker Premium - Login</title>
+    <title>Roblox Cookie Checker Premium</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Preloader */
+        #preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        .loader {
+            width: 80px;
+            height: 80px;
+            position: relative;
+        }
+
+        .loader-inner {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 4px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loader-inner:nth-child(2) {
+            border-top-color: #10b981;
+            animation-delay: 0.2s;
+        }
+
+        .loader-inner:nth-child(3) {
+            border-top-color: #f59e0b;
+            animation-delay: 0.4s;
+        }
+
+        .loader-text {
+            margin-top: 20px;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            text-align: center;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+    </style>
 </head>
 <body class="login-page">
+    <!-- Preloader -->
+    <div id="preloader">
+        <div class="loader">
+            <div class="loader-inner"></div>
+            <div class="loader-inner"></div>
+            <div class="loader-inner"></div>
+        </div>
+        <div class="loader-text">Loading...</div>
+    </div>
+
+    <!-- Main Content -->
     <div class="login-container">
         <div class="login-box">
             <div class="login-header">
                 <i class="fas fa-shield-alt"></i>
                 <h1>Roblox Cookie Checker</h1>
-                <p class="subtitle">Sistem Premium - Admin Controlled</p>
+                <p class="subtitle">Premium System - Admin Controlled</p>
             </div>
             
             <div class="login-body">
                 <div class="info-card">
                     <i class="fas fa-info-circle"></i>
-                    <p>Hanya pengguna berbayar yang memiliki akses. Hubungi admin untuk mendapatkan akun.</p>
+                    <p>Premium access only. Contact admin for account creation.</p>
                 </div>
                 
                 <form id="loginForm">
@@ -28,14 +92,16 @@
                         <label for="username">
                             <i class="fas fa-user"></i> Username
                         </label>
-                        <input type="text" id="username" required placeholder="Masukkan username">
+                        <input type="text" id="username" required 
+                               placeholder="Enter your username" autocomplete="username">
                     </div>
                     
                     <div class="form-group">
                         <label for="password">
                             <i class="fas fa-lock"></i> Password
                         </label>
-                        <input type="password" id="password" required placeholder="Masukkan password">
+                        <input type="password" id="password" required 
+                               placeholder="Enter your password" autocomplete="current-password">
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-block">
@@ -43,93 +109,87 @@
                     </button>
                     
                     <div class="login-footer">
-                        <p>Belum punya akun? <a href="mailto:admin@example.com">Hubungi Admin</a></p>
-                        <p><a href="/admin">Admin Login</a></p>
+                        <p>Need an account? <a href="mailto:admin@example.com">Contact Admin</a></p>
+                        <p><a href="/admin" class="admin-link">
+                            <i class="fas fa-user-shield"></i> Admin Login
+                        </a></p>
                     </div>
                 </form>
             </div>
             
             <div class="login-footer-bottom">
                 <p>&copy; 2024 Roblox Cookie Checker Premium</p>
-                <p class="version">v3.0.0 - Admin Controlled System</p>
+                <p class="version">v4.0.0 - Optimized & Enhanced</p>
             </div>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script src="script.js"></script>
     <script>
-        // Toastr config
-        toastr.options = {
-            positionClass: "toast-top-right",
-            timeOut: 3000,
-            closeButton: true
-        };
+        // Remove preloader when page loads
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                const preloader = document.getElementById('preloader');
+                preloader.style.opacity = '0';
+                setTimeout(() => {
+                    preloader.style.display = 'none';
+                }, 500);
+            }, 500);
+        });
 
-        // Login form submission
+        // Login form handler
         document.getElementById('loginForm').onsubmit = async function(e) {
             e.preventDefault();
             
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             
-            const loginBtn = this.querySelector('button');
-            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-            loginBtn.disabled = true;
+            if (!username || !password) {
+                App.toastManager.error('Please enter username and password');
+                return;
+            }
+            
+            App.loadingManager.show('Authenticating...');
             
             try {
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password })
-                });
+                const response = await App.apiClient.post('/auth/login', { username, password });
                 
-                const data = await response.json();
-                
-                if (data.success) {
-                    toastr.success('Login berhasil!');
+                if (response.success) {
+                    App.toastManager.success('Login successful!');
                     
-                    // Redirect based on user type
+                    // Show success animation
+                    const loginBox = document.querySelector('.login-box');
+                    loginBox.style.animation = 'fadeOut 0.5s ease forwards';
+                    
                     setTimeout(() => {
-                        if (data.user.is_admin) {
+                        if (response.user.is_admin) {
                             window.location.href = '/admin-dashboard';
                         } else {
                             window.location.href = '/dashboard';
                         }
-                    }, 1000);
-                } else {
-                    toastr.error(data.detail || 'Login gagal');
-                    loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
-                    loginBtn.disabled = false;
+                    }, 500);
                 }
             } catch (error) {
-                toastr.error('Koneksi error: ' + error.message);
-                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
-                loginBtn.disabled = false;
+                console.error('Login error:', error);
+            } finally {
+                App.loadingManager.hide();
             }
         };
-        
-        // Check if already logged in
-        async function checkExistingSession() {
-            try {
-                const response = await fetch('/api/auth/me');
-                const data = await response.json();
-                
-                if (data.success) {
-                    if (data.user.is_admin) {
-                        window.location.href = '/admin-dashboard';
-                    } else {
-                        window.location.href = '/dashboard';
-                    }
-                }
-            } catch (error) {
-                // Not logged in, stay on login page
+
+        // Add keypress listener for Enter key
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && document.getElementById('loginForm')) {
+                document.getElementById('loginForm').requestSubmit();
             }
-        }
-        
-        // Run check on page load
-        checkExistingSession();
+        });
+
+        // Auto-focus username field
+        setTimeout(() => {
+            const usernameField = document.getElementById('username');
+            if (usernameField) {
+                usernameField.focus();
+            }
+        }, 100);
     </script>
 </body>
 </html>
