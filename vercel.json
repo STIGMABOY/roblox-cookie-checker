@@ -1,19 +1,45 @@
 {
+  "version": 2,
   "rewrites": [
     { "source": "/", "destination": "/public/index.html" },
     { "source": "/dashboard", "destination": "/public/dashboard.html" },
     { "source": "/admin", "destination": "/public/admin.html" },
     { "source": "/admin-dashboard", "destination": "/public/dashboard_admin.html" },
-    { "source": "/api/(.*)", "destination": "/api/index.py" },
-    { "source": "/(.*)", "destination": "/public/$1" }
+    { "source": "/api/(.*)", "destination": "/api/index.py" }
   ],
   "builds": [
-    { "src": "api/**/*.py", "use": "@vercel/python" },
-    { "src": "public/**", "use": "@vercel/static" }
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/(.*\\.(ico|png|jpg|jpeg|svg|css|js))",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate"
+      }
+    }
   ],
   "env": {
     "ADMIN_USERNAME": "admin",
     "ADMIN_PASSWORD": "admin123",
-    "SECRET_KEY": "change-this-in-production-2024"
+    "SECRET_KEY": "your-secret-key-change-in-production"
   }
 }
