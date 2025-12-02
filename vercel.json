@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/public/index.html" },
+    { "source": "/dashboard", "destination": "/public/dashboard.html" },
+    { "source": "/admin", "destination": "/public/admin.html" },
+    { "source": "/admin-dashboard", "destination": "/public/dashboard_admin.html" },
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/(.*)", "destination": "/public/$1" }
+  ],
+  "builds": [
+    { "src": "api/**/*.py", "use": "@vercel/python" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
+  "env": {
+    "ADMIN_USERNAME": "admin",
+    "ADMIN_PASSWORD": "admin123",
+    "SECRET_KEY": "change-this-in-production-2024"
+  }
+}

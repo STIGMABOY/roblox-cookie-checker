@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roblox Cookie Checker Premium - Login</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <i class="fas fa-shield-alt"></i>
+                <h1>Roblox Cookie Checker</h1>
+                <p class="subtitle">Sistem Premium - Admin Controlled</p>
+            </div>
+            
+            <div class="login-body">
+                <div class="info-card">
+                    <i class="fas fa-info-circle"></i>
+                    <p>Hanya pengguna berbayar yang memiliki akses. Hubungi admin untuk mendapatkan akun.</p>
+                </div>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="username">
+                            <i class="fas fa-user"></i> Username
+                        </label>
+                        <input type="text" id="username" required placeholder="Masukkan username">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">
+                            <i class="fas fa-lock"></i> Password
+                        </label>
+                        <input type="password" id="password" required placeholder="Masukkan password">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                    
+                    <div class="login-footer">
+                        <p>Belum punya akun? <a href="mailto:admin@example.com">Hubungi Admin</a></p>
+                        <p><a href="/admin">Admin Login</a></p>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="login-footer-bottom">
+                <p>&copy; 2024 Roblox Cookie Checker Premium</p>
+                <p class="version">v3.0.0 - Admin Controlled System</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+        // Toastr config
+        toastr.options = {
+            positionClass: "toast-top-right",
+            timeOut: 3000,
+            closeButton: true
+        };
+
+        // Login form submission
+        document.getElementById('loginForm').onsubmit = async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            const loginBtn = this.querySelector('button');
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            loginBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    toastr.success('Login berhasil!');
+                    
+                    // Redirect based on user type
+                    setTimeout(() => {
+                        if (data.user.is_admin) {
+                            window.location.href = '/admin-dashboard';
+                        } else {
+                            window.location.href = '/dashboard';
+                        }
+                    }, 1000);
+                } else {
+                    toastr.error(data.detail || 'Login gagal');
+                    loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                    loginBtn.disabled = false;
+                }
+            } catch (error) {
+                toastr.error('Koneksi error: ' + error.message);
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                loginBtn.disabled = false;
+            }
+        };
+        
+        // Check if already logged in
+        async function checkExistingSession() {
+            try {
+                const response = await fetch('/api/auth/me');
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.user.is_admin) {
+                        window.location.href = '/admin-dashboard';
+                    } else {
+                        window.location.href = '/dashboard';
+                    }
+                }
+            } catch (error) {
+                // Not logged in, stay on login page
+            }
+        }
+        
+        // Run check on page load
+        checkExistingSession();
+    </script>
+</body>
+</html>

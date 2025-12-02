@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Roblox Cookie Checker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <i class="fas fa-user-shield"></i>
+                <h2>Admin Panel</h2>
+                <p class="user-type">Administrator</p>
+            </div>
+            
+            <div class="user-info" id="adminInfo">
+                <div class="loading">Memuat...</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-page="users">
+                    <i class="fas fa-users"></i> Kelola User
+                </a>
+                <a href="#" class="nav-item" data-page="create-user">
+                    <i class="fas fa-user-plus"></i> Buat User Baru
+                </a>
+                <a href="#" class="nav-item" data-page="packages">
+                    <i class="fas fa-box"></i> Paket
+                </a>
+                <a href="#" class="nav-item" data-page="activity">
+                    <i class="fas fa-chart-line"></i> Aktivitas
+                </a>
+                <a href="#" class="nav-item" id="adminLogoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="server-status">
+                    <i class="fas fa-server"></i>
+                    <div class="status-text">System Online</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <h1 id="adminPageTitle">Admin Dashboard</h1>
+                <div class="header-actions">
+                    <button id="refreshStatsBtn" class="btn btn-info btn-sm">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content">
+                <!-- Dashboard Page -->
+                <div id="dashboardPage" class="page active">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-pie"></i> Statistik Sistem</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="stats-grid" id="systemStats">
+                                <div class="loading-stats">
+                                    <i class="fas fa-spinner fa-spin"></i> Memuat statistik...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-history"></i> Aktivitas Terbaru</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>User</th>
+                                                    <th>Waktu</th>
+                                                    <th>Valid</th>
+                                                    <th>Robux</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="recentActivityTable">
+                                                <!-- Recent activity will be loaded here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-box"></i> Statistik Paket</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Paket</th>
+                                                    <th>Jumlah User</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="packageStatsTable">
+                                                <!-- Package stats will be loaded here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Page -->
+                <div id="usersPage" class="page">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-users"></i> Daftar User</h3>
+                            <button id="refreshUsersBtn" class="btn btn-sm btn-info">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Username</th>
+                                            <th>Email</th>
+                                            <th>Paket</th>
+                                            <th>Status</th>
+                                            <th>Berkhir</th>
+                                            <th>Checks</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usersTable">
+                                        <!-- Users will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create User Page -->
+                <div id="createUserPage" class="page">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-user-plus"></i> Buat User Baru</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="createUserForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="newUsername">
+                                                <i class="fas fa-user"></i> Username
+                                            </label>
+                                            <input type="text" id="newUsername" required 
+                                                   placeholder="Masukkan username">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="newPassword">
+                                                <i class="fas fa-lock"></i> Password
+                                            </label>
+                                            <input type="text" id="newPassword" required 
+                                                   value="123456" readonly>
+                                            <small class="text-muted">Password default, user bisa ganti nanti</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="newEmail">
+                                                <i class="fas fa-envelope"></i> Email (opsional)
+                                            </label>
+                                            <input type="email" id="newEmail" 
+                                                   placeholder="email@example.com">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="newFullName">
+                                                <i class="fas fa-id-card"></i> Nama Lengkap (opsional)
+                                            </label>
+                                            <input type="text" id="newFullName" 
+                                                   placeholder="Nama lengkap user">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="packageSelect">
+                                                <i class="fas fa-box"></i> Pilih Paket
+                                            </label>
+                                            <select id="packageSelect" required>
+                                                <option value="">Pilih paket...</option>
+                                                <!-- Packages will be loaded dynamically -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="accountType">
+                                                <i class="fas fa-user-tag"></i> Tipe Akun
+                                            </label>
+                                            <select id="accountType">
+                                                <option value="premium">Premium</option>
+                                                <option value="basic">Basic</option>
+                                                <option value="trial">Trial</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-check"></i> Buat User
+                                    </button>
+                                    <button type="button" id="generatePasswordBtn" class="btn btn-secondary">
+                                        <i class="fas fa-key"></i> Generate Password
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Packages Page -->
+                <div id="packagesPage" class="page">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-box"></i> Paket yang Tersedia</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="packagesList">
+                                <!-- Packages will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Page -->
+                <div id="activityPage" class="page">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-line"></i> Aktivitas Sistem</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="activityStats">
+                                <!-- Activity stats will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="content-footer">
+                <p>© 2024 Roblox Cookie Checker Premium Admin Panel | 
+                    <span id="totalUsers">0</span> total users | 
+                    <span id="totalChecks">0</span> total checks
+                </p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- User Management Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content modal-lg">
+            <span class="close">&times;</span>
+            <div class="modal-header">
+                <h4><i class="fas fa-user-edit"></i> Kelola User</h4>
+            </div>
+            <div class="modal-body" id="userModalBody">
+                <!-- User management form will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+        // Toastr config
+        toastr.options = {
+            positionClass: "toast-top-right",
+            timeOut: 3000,
+            closeButton: true
+        };
+
+        let adminData = null;
+        let packagesList = [];
+
+        // Check admin authentication
+        async function checkAdminAuth() {
+            try {
+                const response = await fetch('/api/auth/me');
+                const data = await response.json();
+                
+                if (!data.success || !data.user.is_admin) {
+                    window.location.href = '/admin';
+                    return;
+                }
+                
+                adminData = data.user;
+                await loadAdminInfo();
+                await loadSystemStats();
+                await loadPackages();
+                await loadUsers();
+            } catch (error) {
+                window.location.href = '/admin';
+            }
+        }
+
+        // Load admin info
+        async function loadAdminInfo() {
+            document.getElementById('adminInfo').innerHTML = `
+                <div class="user-avatar admin">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div class="user-details">
+                    <h3>${adminData.username}</h3>
+                    <p class="user-email">Administrator</p>
+                    <p class="user-created">Last login: Just now</p>
+                </div>
+            `;
+        }
+
+        // Load system statistics
+        async function loadSystemStats() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                const data = await response.json();
+                
+                // Update system stats
+                document.getElementById('systemStats').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-value">${data.stats.total_users}</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="stat-value">${data.stats.active_users}</div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="stat-value">${data.stats.total_checks}</div>
+                        <div class="stat-label">Total Checks</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="stat-value">${data.stats.total_robux.toLocaleString()}</div>
+                        <div class="stat-label">Total Robux</div>
+                    </div>
+                `;
+                
+                // Update footer
+                document.getElementById('totalUsers').textContent = data.stats.total_users;
+                document.getElementById('totalChecks').textContent = data.stats.total_checks;
+                
+                // Update recent activity
+                let activityHTML = '';
+                if (data.recent_activity && data.recent_activity.length > 0) {
+                    data.recent_activity.forEach(activity => {
+                        const date = new Date(activity.timestamp);
+                        activityHTML += `
+                            <tr>
+                                <td>${activity.username}</td>
+                                <td>${date.toLocaleString()}</td>
+                                <td><span class="badge badge-success">${activity.valid_count}</span></td>
+                                <td><span class="robux">${activity.total_robux.toLocaleString()}</span></td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    activityHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center">
+                                <p class="no-data">Belum ada aktivitas</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+                document.getElementById('recentActivityTable').innerHTML = activityHTML;
+                
+                // Update package stats
+                let packageHTML = '';
+                if (data.package_stats && data.package_stats.length > 0) {
+                    data.package_stats.forEach(pkg => {
+                        packageHTML += `
+                            <tr>
+                                <td>${pkg.name}</td>
+                                <td><span class="badge badge-info">${pkg.user_count}</span></td>
+                            </tr>
+                        `;
+                    });
+                }
+                document.getElementById('packageStatsTable').innerHTML = packageHTML;
+                
+            } catch (error) {
+                console.error('Error loading system stats:', error);
+            }
+        }
+
+        // Load packages
+        async function loadPackages() {
+            try {
+                // Load packages for create user form
+                const response = await fetch('/api/admin/packages');
+                const data = await response.json();
+                
+                packagesList = data.packages || [];
+                
+                let optionsHTML = '';
+                packagesList.forEach(pkg => {
+                    optionsHTML += `
+                        <option value="${pkg.id}">
+                            ${pkg.name} - ${pkg.duration_days} hari (Rp ${pkg.price.toLocaleString()})
+                        </option>
+                    `;
+                });
+                
+                document.getElementById('packageSelect').innerHTML = `
+                    <option value="">Pilih paket...</option>
+                    ${optionsHTML}
+                `;
+                
+                // Load packages list for packages page
+                let packagesHTML = '';
+                packagesList.forEach(pkg => {
+                    packagesHTML += `
+                        <div class="package-card">
+                            <div class="package-header">
+                                <h4>${pkg.name}</h4>
+                                <span class="package-price">Rp ${pkg.price.toLocaleString()}</span>
+                            </div>
+                            <div class="package-body">
+                                <p><i class="fas fa-calendar-alt"></i> ${pkg.duration_days} hari</p>
+                                <p><i class="fas fa-cookie-bite"></i> ${pkg.max_cookies_per_check} cookie/check</p>
+                                <p><i class="fas fa-bolt"></i> ${pkg.daily_limit} checks/hari</p>
+                                <p class="package-status ${pkg.is_active ? 'active' : 'inactive'}">
+                                    ${pkg.is_active ? 'Aktif' : 'Tidak Aktif'}
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('packagesList').innerHTML = packagesHTML;
+                
+            } catch (error) {
+                console.error('Error loading packages:', error);
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users');
+                const data = await response.json();
+                
+                let usersHTML = '';
+                
+                if (data.users && data.users.length > 0) {
+                    data.users.forEach(user => {
+                        usersHTML += `
+                            <tr>
+                                <td>
+                                    <strong>${user.username}</strong>
+                                    ${user.full_name ? `<br><small>${user.full_name}</small>` : ''}
+                                </td>
+                                <td>${user.email || '-'}</td>
+                                <td>${user.package_name || 'Unknown'}</td>
+                                <td>
+                                    <span class="badge ${user.is_active ? 'badge-success' : 'badge-danger'}">
+                                        ${user.is_active ? 'Aktif' : 'Nonaktif'}
+                                    </span>
+                                    <br>
+                                    <small>${user.subscription_status}</small>
+                                </td>
+                                <td>
+                                    ${user.subscription_expires ? 
+                                        new Date(user.subscription_expires).toLocaleDateString() : 
+                                        '-'}
+                                </td>
+                                <td>${user.checks_today || 0}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" onclick="manageUser(${user.id})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-warning" onclick="resetPassword(${user.id})">
+                                        <i class="fas fa-key"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    usersHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                <p class="no-data">Belum ada user</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+                
+                document.getElementById('usersTable').innerHTML = usersHTML;
+                
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // Create new user
+        async function createUser() {
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const email = document.getElementById('newEmail').value.trim();
+            const fullName = document.getElementById('newFullName').value.trim();
+            const packageId = document.getElementById('packageSelect').value;
+            const accountType = document.getElementById('accountType').value;
+            
+            if (!username) {
+                toastr.error('Username harus diisi');
+                return;
+            }
+            
+            if (!packageId) {
+                toastr.error('Pilih paket terlebih dahulu');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/create-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                        email: email || null,
+                        full_name: fullName || null,
+                        package_id: parseInt(packageId),
+                        account_type: accountType
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    toastr.success('User berhasil dibuat!');
+                    
+                    // Reset form
+                    document.getElementById('createUserForm').reset();
+                    document.getElementById('newPassword').value = '123456';
+                    
+                    // Reload users list
+                    await loadUsers();
+                    await loadSystemStats();
+                } else {
+                    toastr.error(data.detail || 'Gagal membuat user');
+                }
+            } catch (error) {
+                toastr.error('Error: ' + error.message);
+            }
+        }
+
+        // Manage user (open modal)
+        async function manageUser(userId) {
+            try {
+                const response = await fetch(`/api/admin/user/${userId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const user = data.user;
+                    
+                    document.getElementById('userModalBody').innerHTML = `
+                        <form id="editUserForm" onsubmit="updateUser(${userId}); return false;">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Username</label>
+                                        <input type="text" class="form-control" 
+                                               value="${user.username}" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Status Akun</label>
+                                        <select id="editIsActive" class="form-control">
+                                            <option value="1" ${user.is_active ? 'selected' : ''}>Aktif</option>
+                                            <option value="0" ${!user.is_active ? 'selected' : ''}>Nonaktif</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Tipe Akun</label>
+                                        <select id="editAccountType" class="form-control">
+                                            <option value="premium" ${user.account_type === 'premium' ? 'selected' : ''}>Premium</option>
+                                            <option value="basic" ${user.account_type === 'basic' ? 'selected' : ''}>Basic</option>
+                                            <option value="trial" ${user.account_type === 'trial' ? 'selected' : ''}>Trial</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Tambah Masa Aktif (hari)</label>
+                                        <input type="number" id="editAddDays" class="form-control" 
+                                               value="30" min="1" max="365">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Max Cookie/Check</label>
+                                        <input type="number" id="editMaxCookies" class="form-control" 
+                                               value="${user.max_cookies_per_check}">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Limit Harian</label>
+                                        <input type="number" id="editDailyLimit" class="form-control" 
+                                               value="${user.daily_limit}">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Simpan Perubahan
+                                </button>
+                                <button type="button" class="btn btn-danger" onclick="deleteUser(${userId})">
+                                    <i class="fas fa-trash"></i> Hapus User
+                                </button>
+                            </div>
+                        </form>
+                    `;
+                    
+                    openModal('userModal');
+                }
+            } catch (error) {
+                toastr.error('Error loading user data');
+            }
+        }
+
+        // Update user
+        async function updateUser(userId) {
+            const isActive = document.getElementById('editIsActive').value === '1';
+            const accountType = document.getElementById('editAccountType').value;
+            const addDays = parseInt(document.getElementById('editAddDays').value) || 0;
+            const maxCookies = parseInt(document.getElementById('editMaxCookies').value);
+            const dailyLimit = parseInt(document.getElementById('editDailyLimit').value);
+            
+            try {
+                const response = await fetch('/api/admin/update-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        is_active: isActive,
+                        account_type: accountType,
+                        subscription_days: addDays,
+                        max_cookies_per_check: maxCookies,
+                        daily_limit: dailyLimit
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    toastr.success('User berhasil diperbarui');
+                    closeModal();
+                    await loadUsers();
+                    await loadSystemStats();
+                } else {
+                    toastr.error(data.detail || 'Gagal memperbarui user');
+                }
+            } catch (error) {
+                toastr.error('Error: ' + error.message);
+            }
+        }
+
+        // Reset user password
+        async function resetPassword(userId) {
+            if (!confirm('Reset password user? Password akan diubah menjadi default (123456)')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/reset-password/${userId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    toastr.success(`Password telah direset. Password baru: ${data.new_password}`);
+                } else {
+                    toastr.error(data.detail || 'Gagal reset password');
+                }
+            } catch (error) {
+                toastr.error('Error: ' + error.message);
+            }
+        }
+
+        // Generate random password
+        function generatePassword() {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+            let password = '';
+            for (let i = 0; i < 12; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            document.getElementById('newPassword').value = password;
+        }
+
+        // Open modal
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        // Close modal
+        function closeModal() {
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.style.display = 'none';
+            });
+        }
+
+        // Logout
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/admin';
+            } catch (error) {
+                window.location.href = '/admin';
+            }
+        }
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAdminAuth();
+            
+            // Page navigation
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    if (this.id === 'adminLogoutBtn') {
+                        logout();
+                        return;
+                    }
+                    
+                    // Remove active class
+                    document.querySelectorAll('.nav-item').forEach(nav => {
+                        nav.classList.remove('active');
+                    });
+                    
+                    // Add active to clicked
+                    this.classList.add('active');
+                    
+                    // Show corresponding page
+                    const page = this.getAttribute('data-page');
+                    document.querySelectorAll('.page').forEach(p => {
+                        p.classList.remove('active');
+                    });
+                    
+                    document.getElementById(page + 'Page').classList.add('active');
+                    document.getElementById('adminPageTitle').textContent = 
+                        this.textContent.trim();
+                });
+            });
+            
+            // Create user form
+            document.getElementById('createUserForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                createUser();
+            });
+            
+            // Generate password button
+            document.getElementById('generatePasswordBtn').addEventListener('click', generatePassword);
+            
+            // Refresh buttons
+            document.getElementById('refreshStatsBtn').addEventListener('click', loadSystemStats);
+            document.getElementById('refreshUsersBtn').addEventListener('click', loadUsers);
+            
+            // Close modal buttons
+            document.querySelectorAll('.close').forEach(btn => {
+                btn.addEventListener('click', closeModal);
+            });
+            
+            // Close modal on outside click
+            window.addEventListener('click', function(event) {
+                if (event.target.classList.contains('modal')) {
+                    closeModal();
+                }
+            });
+        });
+
+        // Additional CSS for admin panel
+        const style = document.createElement('style');
+        style.textContent = `
+            .admin .user-avatar {
+                background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            }
+            
+            .package-card {
+                background: white;
+                border: 1px solid #e0e0e0;
+                border-radius: 10px;
+                padding: 20px;
+                margin-bottom: 15px;
+                box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            }
+            
+            .package-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 15px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #f0f0f0;
+            }
+            
+            .package-header h4 {
+                margin: 0;
+                color: #333;
+            }
+            
+            .package-price {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 5px 15px;
+                border-radius: 20px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            
+            .package-body p {
+                margin: 5px 0;
+                color: #666;
+            }
+            
+            .package-body p i {
+                width: 20px;
+                text-align: center;
+                margin-right: 8px;
+                color: #667eea;
+            }
+            
+            .package-status {
+                display: inline-block;
+                padding: 3px 10px;
+                border-radius: 15px;
+                font-size: 12px;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+            
+            .package-status.active {
+                background: #d4edda;
+                color: #155724;
+            }
+            
+            .package-status.inactive {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            
+            .row {
+                display: flex;
+                flex-wrap: wrap;
+                margin: 0 -10px;
+            }
+            
+            .col-md-6 {
+                flex: 0 0 50%;
+                max-width: 50%;
+                padding: 0 10px;
+            }
+            
+            @media (max-width: 768px) {
+                .col-md-6 {
+                    flex: 0 0 100%;
+                    max-width: 100%;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

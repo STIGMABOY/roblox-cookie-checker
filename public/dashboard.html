@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Roblox Cookie Checker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <h2>Cookie Checker</h2>
+                <p class="user-type" id="userType">Premium User</p>
+            </div>
+            
+            <div class="user-info" id="userInfo">
+                <div class="loading">Memuat informasi...</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="checker">
+                    <i class="fas fa-search"></i> Cek Cookie
+                </a>
+                <a href="#" class="nav-item" data-page="history">
+                    <i class="fas fa-history"></i> Riwayat
+                </a>
+                <a href="#" class="nav-item" data-page="stats">
+                    <i class="fas fa-chart-bar"></i> Statistik
+                </a>
+                <a href="#" class="nav-item" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="subscription-info" id="subscriptionInfo">
+                    <i class="fas fa-crown"></i>
+                    <div class="sub-text">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <h1 id="pageTitle">Cek Cookie Roblox</h1>
+                <div class="header-stats">
+                    <div class="stat-item">
+                        <i class="fas fa-cookie-bite"></i>
+                        <span>Hari ini: <span id="todayChecks">0</span>/<span id="dailyLimit">0</span></span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-bolt"></i>
+                        <span>Max: <span id="maxCookies">0</span> cookie</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content">
+                <!-- Checker Page -->
+                <div id="checkerPage" class="page active">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-cookie-bite"></i> Masukkan Cookie Roblox</h3>
+                            <p>Satu cookie per baris. Sistem akan mengecek satu per satu dengan delay.</p>
+                        </div>
+                        <div class="card-body">
+                            <textarea 
+                                id="cookieInput" 
+                                placeholder="Masukkan cookie Roblox di sini...
+Contoh: _|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_a1b2c3d4e5f6..."
+                                rows="12"
+                            ></textarea>
+                            
+                            <div class="input-info">
+                                <span><i class="fas fa-hashtag"></i> <span id="cookieCount">0</span> cookie ditemukan</span>
+                                <span><i class="fas fa-clock"></i> Estimasi: <span id="estTime">0</span> detik</span>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button id="checkCookiesBtn" class="btn btn-primary">
+                                    <i class="fas fa-play"></i> Mulai Pengecekan
+                                </button>
+                                <button id="clearCookiesBtn" class="btn btn-secondary">
+                                    <i class="fas fa-trash"></i> Hapus Semua
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Section -->
+                    <div id="resultsSection" style="display: none;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-chart-bar"></i> Hasil Pengecekan</h3>
+                                <div class="header-actions">
+                                    <button id="exportResultsBtn" class="btn btn-sm btn-success">
+                                        <i class="fas fa-download"></i> Export
+                                    </button>
+                                    <button id="clearResultsBtn" class="btn btn-sm btn-secondary">
+                                        <i class="fas fa-times"></i> Hapus
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Summary -->
+                                <div class="results-summary" id="resultsSummary">
+                                    <div class="summary-loading">
+                                        <i class="fas fa-spinner fa-spin"></i> Memproses hasil...
+                                    </div>
+                                </div>
+                                
+                                <!-- Results Table -->
+                                <div class="table-responsive">
+                                    <table class="results-table" id="resultsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Status</th>
+                                                <th>Username</th>
+                                                <th>User ID</th>
+                                                <th>Robux</th>
+                                                <th>Premium</th>
+                                                <th>Detail</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="resultsBody">
+                                            <!-- Results will be loaded here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Page -->
+                <div id="historyPage" class="page">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-history"></i> Riwayat Pengecekan</h3>
+                            <button id="refreshHistoryBtn" class="btn btn-sm btn-info">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tanggal/Waktu</th>
+                                            <th>Valid</th>
+                                            <th>Invalid</th>
+                                            <th>Total Robux</th>
+                                            <th>Detail</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="historyTable">
+                                        <tr>
+                                            <td colspan="5" class="text-center">
+                                                <div class="loading-history">
+                                                    <i class="fas fa-spinner fa-spin"></i> Memuat riwayat...
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Page -->
+                <div id="statsPage" class="page">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-line"></i> Statistik Akun</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="stats-container" id="statsContainer">
+                                <div class="loading-stats">
+                                    <i class="fas fa-spinner fa-spin"></i> Memuat statistik...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="content-footer">
+                <p>© 2024 Roblox Cookie Checker Premium | 
+                    <span id="accountStatus">Premium Active</span> | 
+                    <span id="remainingDays">0</span> hari lagi
+                </p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <i class="fas fa-spinner fa-spin fa-3x"></i>
+            <h3 id="loadingText">Memproses cookie...</h3>
+            <div class="loading-progress">
+                <div class="progress-bar" id="progressBar"></div>
+                <div class="progress-text" id="progressText">0/0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content modal-lg">
+            <span class="close">&times;</span>
+            <div class="modal-body" id="detailModalBody">
+                <!-- Detail will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+        // Toastr config
+        toastr.options = {
+            positionClass: "toast-top-right",
+            timeOut: 3000,
+            closeButton: true
+        };
+
+        let userData = null;
+        let checkResults = null;
+
+        // Check authentication
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/me');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    window.location.href = '/';
+                    return;
+                }
+                
+                userData = data.user;
+                await loadUserInfo();
+                await loadUserStats();
+                await loadHistory();
+            } catch (error) {
+                window.location.href = '/';
+            }
+        }
+
+        // Load user info
+        async function loadUserInfo() {
+            if (!userData) return;
+            
+            document.getElementById('userInfo').innerHTML = `
+                <div class="user-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-details">
+                    <h3>${userData.username}</h3>
+                    <p class="user-email">${userData.email || 'No email'}</p>
+                    <p class="user-created">Dibuat oleh: ${userData.created_by}</p>
+                </div>
+            `;
+            
+            // Update user type
+            document.getElementById('userType').textContent = userData.account_type.toUpperCase();
+            
+            // Update header stats
+            document.getElementById('todayChecks').textContent = userData.checks_today;
+            document.getElementById('dailyLimit').textContent = userData.daily_limit;
+            document.getElementById('maxCookies').textContent = userData.max_cookies_per_check;
+            
+            // Update subscription info
+            if (userData.subscription_expires) {
+                const expires = new Date(userData.subscription_expires);
+                const now = new Date();
+                const diffTime = expires - now;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                let statusText = '';
+                let statusClass = '';
+                
+                if (diffDays > 0) {
+                    statusText = `Aktif (${diffDays} hari lagi)`;
+                    statusClass = 'text-success';
+                    document.getElementById('accountStatus').textContent = 'Active';
+                    document.getElementById('remainingDays').textContent = diffDays;
+                } else {
+                    statusText = 'Kedaluwarsa';
+                    statusClass = 'text-danger';
+                    document.getElementById('accountStatus').textContent = 'Expired';
+                    document.getElementById('remainingDays').textContent = '0';
+                }
+                
+                document.getElementById('subscriptionInfo').innerHTML = `
+                    <i class="fas fa-crown"></i>
+                    <div class="sub-text ${statusClass}">${statusText}</div>
+                `;
+            }
+        }
+
+        // Load user stats
+        async function loadUserStats() {
+            try {
+                const response = await fetch('/api/user/stats');
+                const data = await response.json();
+                
+                document.getElementById('statsContainer').innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <div class="stat-value">${data.stats.total_checks}</div>
+                            <div class="stat-label">Total Checks</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-value">${data.stats.total_valid}</div>
+                            <div class="stat-label">Cookie Valid</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            <div class="stat-value">${data.stats.total_robux.toLocaleString()}</div>
+                            <div class="stat-label">Total Robux</div>
+                        </div>
+                    </div>
+                    
+                    <div class="account-info">
+                        <h4><i class="fas fa-info-circle"></i> Informasi Akun</h4>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Package:</label>
+                                <span>${data.account.package}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Tipe Akun:</label>
+                                <span class="badge badge-info">${data.account.account_type}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Status:</label>
+                                <span class="badge ${data.account.subscription_status === 'active' ? 'badge-success' : 'badge-danger'}">
+                                    ${data.account.subscription_status === 'active' ? 'Aktif' : 'Expired'}
+                                </span>
+                            </div>
+                            <div class="info-item">
+                                <label>Berkhir:</label>
+                                <span>${new Date(data.account.subscription_expires).toLocaleDateString()}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Max Cookie/Check:</label>
+                                <span>${data.account.max_cookies_per_check}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Limit Harian:</label>
+                                <span>${data.account.daily_limit}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load check history
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/user/history');
+                const data = await response.json();
+                
+                let tableHTML = '';
+                
+                if (data.history && data.history.length > 0) {
+                    data.history.forEach(item => {
+                        const date = new Date(item.timestamp);
+                        tableHTML += `
+                            <tr>
+                                <td>${date.toLocaleString()}</td>
+                                <td><span class="badge badge-success">${item.valid_count}</span></td>
+                                <td><span class="badge badge-danger">${item.invalid_count}</span></td>
+                                <td><span class="robux">${item.total_robux.toLocaleString()}</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" onclick="viewHistoryDetail(${item.id})">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tableHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                <p class="no-data">Belum ada riwayat pengecekan</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+                
+                document.getElementById('historyTable').innerHTML = tableHTML;
+            } catch (error) {
+                console.error('Error loading history:', error);
+                document.getElementById('historyTable').innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            <p class="error">Gagal memuat riwayat</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Check cookies function
+        async function checkCookies() {
+            const cookies = document.getElementById('cookieInput').value.trim();
+            if (!cookies) {
+                toastr.error('Masukkan cookie terlebih dahulu');
+                return;
+            }
+            
+            const cookieList = cookies.split('\n').filter(c => c.trim());
+            const cookieCount = cookieList.length;
+            
+            if (cookieCount > userData.max_cookies_per_check) {
+                toastr.error(`Maksimum ${userData.max_cookies_per_check} cookie per pengecekan`);
+                return;
+            }
+            
+            if (userData.checks_today >= userData.daily_limit) {
+                toastr.error('Limit harian telah habis');
+                return;
+            }
+            
+            // Show loading overlay
+            showLoading(`Memeriksa ${cookieCount} cookie...`, cookieCount);
+            
+            try {
+                const response = await fetch('/api/check-cookies', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ cookies: cookies })
+                });
+                
+                const data = await response.json();
+                hideLoading();
+                
+                if (data.success) {
+                    checkResults = data;
+                    displayResults(data);
+                    toastr.success('Pengecekan selesai!');
+                    
+                    // Reload user info and history
+                    await loadUserInfo();
+                    await loadHistory();
+                } else {
+                    toastr.error(data.detail || 'Pengecekan gagal');
+                }
+            } catch (error) {
+                hideLoading();
+                toastr.error('Error: ' + error.message);
+            }
+        }
+
+        // Display results
+        function displayResults(data) {
+            const summary = data.summary;
+            const results = data.results;
+            
+            // Show results section
+            document.getElementById('resultsSection').style.display = 'block';
+            
+            // Update summary
+            document.getElementById('resultsSummary').innerHTML = `
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <div class="summary-value">${summary.total}</div>
+                        <div class="summary-label">Total Cookie</div>
+                    </div>
+                    <div class="summary-card success">
+                        <div class="summary-value">${summary.valid}</div>
+                        <div class="summary-label">Valid</div>
+                    </div>
+                    <div class="summary-card danger">
+                        <div class="summary-value">${summary.invalid}</div>
+                        <div class="summary-label">Invalid</div>
+                    </div>
+                    <div class="summary-card warning">
+                        <div class="summary-value">${summary.total_robux.toLocaleString()}</div>
+                        <div class="summary-label">Total Robux</div>
+                    </div>
+                </div>
+            `;
+            
+            // Build results table
+            let tableHTML = '';
+            results.forEach(result => {
+                let statusClass = 'badge-danger';
+                let statusIcon = '<i class="fas fa-times"></i>';
+                let statusText = 'Invalid';
+                
+                if (result.status === 'valid') {
+                    statusClass = 'badge-success';
+                    statusIcon = '<i class="fas fa-check"></i>';
+                    statusText = 'Valid';
+                } else if (result.status === 'error') {
+                    statusClass = 'badge-warning';
+                    statusIcon = '<i class="fas fa-exclamation-triangle"></i>';
+                    statusText = 'Error';
+                }
+                
+                tableHTML += `
+                    <tr>
+                        <td>${result.cookie_id}</td>
+                        <td>
+                            <span class="badge ${statusClass}">
+                                ${statusIcon} ${statusText}
+                            </span>
+                        </td>
+                        <td>${result.username || '-'}</td>
+                        <td>${result.user_id || '-'}</td>
+                        <td>${result.robux ? result.robux.toLocaleString() : '0'}</td>
+                        <td>
+                            ${result.premium ? 
+                                '<span class="badge badge-premium"><i class="fas fa-crown"></i> Premium</span>' : 
+                                '<span class="badge badge-secondary">Standard</span>'
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-info" onclick="showResultDetail(${result.cookie_id - 1})">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            document.getElementById('resultsBody').innerHTML = tableHTML;
+            
+            // Scroll to results
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Show result detail
+        function showResultDetail(index) {
+            if (!checkResults || !checkResults.results[index]) return;
+            
+            const result = checkResults.results[index];
+            const modalBody = document.getElementById('detailModalBody');
+            
+            let detailHTML = `
+                <h4><i class="fas fa-cookie-bite"></i> Detail Cookie #${result.cookie_id}</h4>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Status:</label>
+                        <span class="${result.status === 'valid' ? 'text-success' : 'text-danger'}">
+                            <strong>${result.status.toUpperCase()}</strong>
+                        </span>
+                    </div>`;
+            
+            if (result.status === 'valid') {
+                detailHTML += `
+                    <div class="detail-item">
+                        <label>Username:</label>
+                        <span>${result.username}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>User ID:</label>
+                        <span>${result.user_id}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Display Name:</label>
+                        <span>${result.display_name || result.username}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Robux Balance:</label>
+                        <span class="robux-big">${result.robux ? result.robux.toLocaleString() : '0'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Premium Status:</label>
+                        <span class="${result.premium ? 'text-premium' : 'text-secondary'}">
+                            ${result.premium ? 
+                                '<i class="fas fa-crown"></i> Premium Account' : 
+                                'Standard Account'}
+                        </span>
+                    </div>
+                `;
+            } else {
+                detailHTML += `
+                    <div class="detail-item">
+                        <label>Error:</label>
+                        <span class="text-danger">${result.error || 'Unknown error'}</span>
+                    </div>
+                `;
+            }
+            
+            detailHTML += `
+                </div>
+                <div class="detail-actions">
+                    <button class="btn btn-secondary" onclick="closeModal()">
+                        <i class="fas fa-times"></i> Tutup
+                    </button>
+                </div>
+            `;
+            
+            modalBody.innerHTML = detailHTML;
+            openModal('detailModal');
+        }
+
+        // Show history detail
+        async function viewHistoryDetail(checkId) {
+            toastr.info('Fitur detail riwayat akan segera tersedia');
+        }
+
+        // Cookie input counter
+        function updateCookieCount() {
+            const text = document.getElementById('cookieInput').value;
+            const lines = text.split('\n').filter(line => line.trim().length > 0);
+            const count = lines.length;
+            document.getElementById('cookieCount').textContent = count;
+            
+            // Estimate time (1 second per cookie)
+            const estSeconds = count;
+            document.getElementById('estTime').textContent = estSeconds;
+        }
+
+        // Show loading overlay
+        function showLoading(text, total = 0) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('progressText').textContent = `0/${total}`;
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        // Hide loading overlay
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        // Modal functions
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        function closeModal() {
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.style.display = 'none';
+            });
+        }
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            
+            // Page navigation
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    if (this.id === 'logoutBtn') {
+                        logout();
+                        return;
+                    }
+                    
+                    // Remove active class from all
+                    document.querySelectorAll('.nav-item').forEach(nav => {
+                        nav.classList.remove('active');
+                    });
+                    
+                    // Add active to clicked
+                    this.classList.add('active');
+                    
+                    // Show corresponding page
+                    const page = this.getAttribute('data-page');
+                    document.querySelectorAll('.page').forEach(p => {
+                        p.classList.remove('active');
+                    });
+                    
+                    document.getElementById(page + 'Page').classList.add('active');
+                    document.getElementById('pageTitle').textContent = 
+                        this.textContent.trim();
+                });
+            });
+            
+            // Check cookies button
+            document.getElementById('checkCookiesBtn').addEventListener('click', checkCookies);
+            
+            // Clear cookies button
+            document.getElementById('clearCookiesBtn').addEventListener('click', function() {
+                document.getElementById('cookieInput').value = '';
+                updateCookieCount();
+                document.getElementById('resultsSection').style.display = 'none';
+            });
+            
+            // Clear results button
+            document.getElementById('clearResultsBtn').addEventListener('click', function() {
+                document.getElementById('resultsSection').style.display = 'none';
+            });
+            
+            // Export results button
+            document.getElementById('exportResultsBtn').addEventListener('click', function() {
+                if (!checkResults) {
+                    toastr.warning('Tidak ada hasil untuk diexport');
+                    return;
+                }
+                
+                // Create export data
+                const exportData = {
+                    summary: checkResults.summary,
+                    results: checkResults.results,
+                    export_date: new Date().toISOString(),
+                    user: userData.username
+                };
+                
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                
+                const exportFileDefaultName = `cookie-check-results-${new Date().getTime()}.json`;
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+                
+                toastr.success('Hasil berhasil diexport');
+            });
+            
+            // Refresh history button
+            document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
+            
+            // Cookie input event
+            document.getElementById('cookieInput').addEventListener('input', updateCookieCount);
+            
+            // Close modal buttons
+            document.querySelectorAll('.close').forEach(btn => {
+                btn.addEventListener('click', closeModal);
+            });
+            
+            // Close modal on outside click
+            window.addEventListener('click', function(event) {
+                if (event.target.classList.contains('modal')) {
+                    closeModal();
+                }
+            });
+            
+            // Check status button
+            document.getElementById('checkStatusBtn').addEventListener('click', async function() {
+                await checkAuth();
+                toastr.success('Status diperbarui');
+            });
+        });
+
+        // Logout function
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (error) {
+                window.location.href = '/';
+            }
+        }
+    </script>
+</body>
+</html>
