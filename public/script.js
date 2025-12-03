@@ -1,8 +1,9 @@
 // ============================================
-// KONFIGURASI
+// KONFIGURASI OPTIMIZED
 // ============================================
 const API_BASE_URL = window.location.origin;
 const SAMPLE_COOKIE = "_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_testcookie123";
+const MAX_COOKIES_PER_BATCH = 500; // Batasi jumlah cookie per batch
 
 // ============================================
 // STATE & VARIABLES
@@ -11,9 +12,12 @@ let currentUser = null;
 let userToken = null;
 let userData = null;
 let isChecking = false;
+let currentBatchId = null;
 let refreshInterval = null;
 let apiConnected = false;
 let currentTab = 'results';
+let checkStartTime = null;
+let batchResults = [];
 
 // ============================================
 // DOM ELEMENTS
@@ -76,6 +80,70 @@ const toastMessage = document.getElementById('toastMessage');
 const toastIcon = document.getElementById('toastIcon');
 const toastClose = document.getElementById('toastClose');
 
+// Create batch info element dynamically
+const batchInfoHTML = `
+<div class="batch-info" id="batchInfo" style="display: none;">
+    <div class="batch-header">
+        <h4><i class="fas fa-layer-group"></i> Batch Information</h4>
+        <div class="batch-actions">
+            <button id="pauseResumeBtn" class="btn-pause-resume" style="display: none;">
+                <i class="fas fa-pause"></i> Pause
+            </button>
+            <button id="batchExportBtn" class="btn-batch-export">
+                <i class="fas fa-download"></i> Export This Batch
+            </button>
+        </div>
+    </div>
+    <div class="batch-stats">
+        <div class="batch-stat">
+            <span class="batch-stat-label">Batch ID:</span>
+            <span class="batch-stat-value" id="batchId">-</span>
+        </div>
+        <div class="batch-stat">
+            <span class="batch-stat-label">Speed:</span>
+            <span class="batch-stat-value" id="checkSpeed">0/sec</span>
+        </div>
+        <div class="batch-stat">
+            <span class="batch-stat-label">ETA:</span>
+            <span class="batch-stat-value" id="checkETA">-</span>
+        </div>
+        <div class="batch-stat">
+            <span class="batch-stat-label">Concurrent:</span>
+            <span class="batch-stat-value" id="concurrentChecks">3</span>
+        </div>
+    </div>
+    <div class="batch-progress-info">
+        <div class="progress-detail">
+            <span>Processed: </span>
+            <span id="processedCount">0</span> / 
+            <span id="totalCount">0</span>
+        </div>
+        <div class="progress-detail">
+            <span>Success Rate: </span>
+            <span id="successRate">0%</span>
+        </div>
+    </div>
+</div>
+`;
+
+// Insert batch info after progress section
+const progressSectionElement = document.querySelector('.progress-section');
+if (progressSectionElement) {
+    progressSectionElement.insertAdjacentHTML('afterend', batchInfoHTML);
+}
+
+// Get new batch elements
+const batchInfo = document.getElementById('batchInfo');
+const batchIdElement = document.getElementById('batchId');
+const checkSpeedElement = document.getElementById('checkSpeed');
+const checkETAElement = document.getElementById('checkETA');
+const concurrentChecksElement = document.getElementById('concurrentChecks');
+const processedCountElement = document.getElementById('processedCount');
+const totalCountElement = document.getElementById('totalCount');
+const successRateElement = document.getElementById('successRate');
+const batchExportBtn = document.getElementById('batchExportBtn');
+const pauseResumeBtn = document.getElementById('pauseResumeBtn');
+
 // ============================================
 // EVENT LISTENERS
 // ============================================
@@ -85,7 +153,7 @@ usernameInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleLog
 passwordInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleLogin());
 cookiesInput.addEventListener('input', updateCookieCount);
 sampleBtn.addEventListener('click', addSampleCookie);
-startBtn.addEventListener('click', startChecking);
+startBtn.addEventListener('click', startCheckingOptimized);
 stopBtn.addEventListener('click', stopChecking);
 testBtn.addEventListener('click', testSingleCookie);
 clearBtn.addEventListener('click', clearResults);
@@ -93,6 +161,8 @@ exportBtn.addEventListener('click', exportValidCookies);
 exportValidBtn.addEventListener('click', exportAllValidCookies);
 refreshLogs.addEventListener('click', fetchLogs);
 toastClose.addEventListener('click', hideToast);
+batchExportBtn.addEventListener('click', exportBatchCookies);
+pauseResumeBtn.addEventListener('click', togglePauseResume);
 
 // Tab buttons
 tabButtons.forEach(button => {
@@ -141,7 +211,7 @@ async function handleLogin() {
             showToast('Login berhasil! Selamat datang.', 'success');
             
             // Initialize dashboard
-            initDashboard();
+            initDashboardOptimized();
         } else {
             showToast(data.message || 'Login gagal!', 'error');
         }
@@ -221,9 +291,9 @@ async function verifyToken() {
 }
 
 // ============================================
-// DASHBOARD INITIALIZATION
+// OPTIMIZED DASHBOARD INITIALIZATION
 // ============================================
-async function initDashboard() {
+async function initDashboardOptimized() {
     try {
         // Load user stats
         await loadUserStats();
@@ -248,6 +318,9 @@ async function initDashboard() {
         // Update cookie count
         updateCookieCount();
         
+        // Check for existing batch
+        checkExistingBatch();
+        
     } catch (error) {
         console.error('Dashboard init error:', error);
         showToast('Error menginisialisasi dashboard', 'error');
@@ -256,7 +329,6 @@ async function initDashboard() {
 
 async function loadUserStats() {
     try {
-        // Simulated user stats - in real app, fetch from API
         const now = new Date();
         const expiry = userData?.expires_at ? new Date(userData.expires_at) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
         const days = Math.max(0, Math.ceil((expiry - now) / (1000 * 60 * 60 * 24)));
@@ -295,60 +367,405 @@ function startAutoRefresh() {
     }
     
     refreshInterval = setInterval(() => {
-        updateStatus();
-        if (isChecking) {
-            fetchResults();
+        if (isChecking && currentBatchId) {
+            updateBatchStatus();
+        } else {
+            updateStatus();
         }
         updateCurrentTime();
-    }, 3000); // Update setiap 3 detik
+    }, 3000);
 }
 
 // ============================================
-// API CONNECTION
+// OPTIMIZED CHECKING FUNCTIONS
 // ============================================
-async function checkApiConnection() {
+
+async function startCheckingOptimized() {
+    const cookies = parseCookies(cookiesInput.value);
+    
+    if (cookies.length === 0) {
+        showToast('Masukkan cookies terlebih dahulu!', 'error');
+        return;
+    }
+    
+    const { validCookies, invalidCookies } = validateCookies(cookies);
+    
+    if (invalidCookies.length > 0) {
+        showToast(`${invalidCookies.length} cookies format tidak valid. Akan di-skip.`, 'warning');
+    }
+    
+    if (validCookies.length === 0) {
+        showToast('Tidak ada cookie yang valid untuk di-check!', 'error');
+        return;
+    }
+    
+    if (validCookies.length > MAX_COOKIES_PER_BATCH) {
+        if (!confirm(`Anda akan check ${validCookies.length} cookies (max ${MAX_COOKIES_PER_BATCH}). Hanya ${MAX_COOKIES_PER_BATCH} pertama yang akan diproses. Lanjutkan?`)) {
+            return;
+        }
+    }
+    
+    if (!apiConnected) {
+        showToast('API tidak terhubung. Tidak dapat memulai checking.', 'error');
+        return;
+    }
+    
+    // Reset batch info
+    currentBatchId = null;
+    checkStartTime = Date.now();
+    batchResults = [];
+    
     try {
+        showToast(`Memulai checking ${Math.min(validCookies.length, MAX_COOKIES_PER_BATCH)} cookies...`, 'info');
+        
+        // Limit cookies jika terlalu banyak
+        const cookiesToCheck = validCookies.slice(0, MAX_COOKIES_PER_BATCH);
+        
         const response = await fetch(`${API_BASE_URL}/api/check`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'start',
+                cookies: cookiesToCheck
+            })
         });
         
-        if (response.ok) {
-            apiConnected = true;
-            apiStatusIcon.className = 'fas fa-wifi';
-            apiStatusText.textContent = 'API Connected';
-            apiStatusIcon.style.color = '#2ecc71';
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            isChecking = true;
+            currentBatchId = data.batch_id;
+            
+            // Update UI
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            progressSection.style.display = 'block';
+            batchInfo.style.display = 'block';
+            
+            // Update batch info
+            batchIdElement.textContent = currentBatchId;
+            totalCountElement.textContent = data.total;
+            processedCountElement.textContent = '0';
+            
+            // Show pause button
+            pauseResumeBtn.style.display = 'flex';
+            pauseResumeBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            
+            showToast(`Checking dimulai! Batch ID: ${currentBatchId}`, 'success');
+            
+            // Start monitoring
+            startBatchMonitoring();
+            
+            // Update user stats
+            updateUserStatsAfterStart(cookiesToCheck.length);
+            
+        } else if (data.batch_id) {
+            // Already running, join existing batch
+            currentBatchId = data.batch_id;
+            showToast(`Bergabung dengan batch yang sedang berjalan: ${currentBatchId}`, 'info');
+            startBatchMonitoring();
         } else {
-            throw new Error('API not responding');
+            showToast(data.message || 'Gagal memulai checking', 'error');
         }
     } catch (error) {
-        apiConnected = false;
-        apiStatusIcon.className = 'fas fa-wifi-slash';
-        apiStatusText.textContent = 'API Disconnected';
-        apiStatusIcon.style.color = '#e74c3c';
-        showToast('API tidak terhubung. Periksa koneksi.', 'error');
+        console.error('Start checking error:', error);
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function startBatchMonitoring() {
+    if (!currentBatchId) return;
+    
+    // Update status every 2 seconds
+    if (refreshInterval) clearInterval(refreshInterval);
+    
+    refreshInterval = setInterval(async () => {
+        await updateBatchStatus();
+    }, 2000);
+}
+
+async function updateBatchStatus() {
+    try {
+        // Get batch status
+        const statusResponse = await fetch(`${API_BASE_URL}/api/check?batch=${currentBatchId}`);
+        if (statusResponse.ok) {
+            const batchData = await statusResponse.json();
+            
+            if (batchData.success) {
+                // Update progress
+                const progress = Math.round((batchData.total_checked / batchData.total) * 100);
+                progressFill.style.width = `${progress}%`;
+                progressPercent.textContent = `${progress}%`;
+                
+                // Update counts
+                processedCountElement.textContent = batchData.total_checked;
+                
+                // Update stats
+                validCount.textContent = batchData.valid || 0;
+                invalidCount.textContent = batchData.invalid || 0;
+                
+                // Calculate success rate
+                if (batchData.total_checked > 0) {
+                    const successRate = Math.round((batchData.valid / batchData.total_checked) * 100);
+                    successRateElement.textContent = `${successRate}%`;
+                }
+                
+                // Calculate speed and ETA
+                if (checkStartTime && batchData.total_checked > 0) {
+                    const elapsedSeconds = (Date.now() - checkStartTime) / 1000;
+                    const speed = batchData.total_checked / elapsedSeconds;
+                    checkSpeedElement.textContent = `${speed.toFixed(1)}/sec`;
+                    
+                    if (speed > 0 && batchData.total) {
+                        const remaining = batchData.total - batchData.total_checked;
+                        const etaSeconds = remaining / speed;
+                        checkETAElement.textContent = formatTime(etaSeconds);
+                    }
+                }
+                
+                // Update progress text
+                progressText.textContent = 
+                    `Checking ${batchData.total_checked} dari ${batchData.total} cookies`;
+                
+                // Store batch results
+                if (batchData.results) {
+                    batchResults = batchData.results;
+                    updateResultsTable(batchResults);
+                }
+                
+                // If completed
+                if (batchData.completed || !batchData.is_running) {
+                    isChecking = false;
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    pauseResumeBtn.style.display = 'none';
+                    
+                    // Show completion message
+                    showToast(`Checking selesai! ${batchData.valid} valid, ${batchData.invalid} invalid`, 'success');
+                    
+                    // Auto-refresh results
+                    fetchResults();
+                    fetchLogs();
+                    
+                    // Clear interval
+                    if (refreshInterval) {
+                        clearInterval(refreshInterval);
+                        refreshInterval = null;
+                    }
+                }
+            }
+        }
+        
+        // Also get general status
+        await updateStatus();
+        
+    } catch (error) {
+        console.error('Batch monitoring error:', error);
+    }
+}
+
+async function stopChecking() {
+    if (!isChecking && !currentBatchId) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'stop' })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            isChecking = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            progressSection.style.display = 'none';
+            pauseResumeBtn.style.display = 'none';
+            
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+            
+            showToast(`Checking dihentikan! Total checked: ${data.total_checked}`, 'warning');
+            
+            // Fetch final results
+            fetchResults();
+            fetchLogs();
+        }
+    } catch (error) {
+        showToast('Error menghentikan checking: ' + error.message, 'error');
+    }
+}
+
+async function togglePauseResume() {
+    if (!currentBatchId) return;
+    
+    try {
+        // First get current status
+        const statusResponse = await fetch(`${API_BASE_URL}/api/check?batch=${currentBatchId}`);
+        if (statusResponse.ok) {
+            const batchData = await statusResponse.json();
+            
+            if (batchData.success) {
+                const action = batchData.status === 'paused' ? 'resume' : 'pause';
+                
+                const response = await fetch(`${API_BASE_URL}/api/check`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (action === 'pause') {
+                        pauseResumeBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+                        showToast('Checking dijeda', 'info');
+                    } else {
+                        pauseResumeBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                        showToast('Checking dilanjutkan', 'success');
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Pause/resume error:', error);
+        showToast('Error: ' + error.message, 'error');
     }
 }
 
 // ============================================
-// COOKIE UTILITIES
+// EXPORT FUNCTIONS
 // ============================================
+
+async function exportBatchCookies() {
+    if (!currentBatchId) {
+        showToast('Tidak ada batch aktif untuk diexport', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'export',
+                batch_id: currentBatchId
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create download
+            const blob = new Blob([data.export_data], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast(`Exported ${data.valid_count} valid cookies (${data.total_robux} Robux)`, 'success');
+        }
+    } catch (error) {
+        console.error('Export batch error:', error);
+        showToast('Error mengexport batch: ' + error.message, 'error');
+    }
+}
+
+async function exportValidCookies() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'export' })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create download
+            const blob = new Blob([data.export_data], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast(`File diexport: ${data.filename}`, 'success');
+        }
+    } catch (error) {
+        console.error('Export error:', error);
+        showToast('Error mengexport: ' + error.message, 'error');
+    }
+}
+
+async function exportAllValidCookies() {
+    await exportValidCookies();
+}
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
 function parseCookies(text) {
     if (!text) return [];
     
     return text.split('\n')
         .map(line => line.trim())
-        .filter(line => {
-            return line.length > 0 && 
-                   (line.includes('_|WARNING:-DO-NOT-SHARE-THIS.') || 
-                    line.length > 50);
-        });
+        .filter(line => line.length > 0);
+}
+
+function validateCookies(cookies) {
+    const validCookies = [];
+    const invalidCookies = [];
+    
+    cookies.forEach((cookie, index) => {
+        if (cookie.includes('_|WARNING:-DO-NOT-SHARE-THIS.')) {
+            validCookies.push(cookie);
+        } else if (cookie.length > 50) {
+            // Might be a cookie without warning prefix
+            validCookies.push(cookie);
+        } else {
+            invalidCookies.push({
+                index: index + 1,
+                cookie: cookie.substring(0, 50) + '...'
+            });
+        }
+    });
+    
+    return { validCookies, invalidCookies };
 }
 
 function updateCookieCount() {
     const cookies = parseCookies(cookiesInput.value);
-    const count = cookies.length;
-    cookieCount.textContent = `${count} cookies ditemukan`;
+    const { validCookies, invalidCookies } = validateCookies(cookies);
+    const count = validCookies.length;
+    
+    cookieCount.textContent = `${count} valid cookies ditemukan`;
+    if (invalidCookies.length > 0) {
+        cookieCount.textContent += `, ${invalidCookies.length} invalid`;
+    }
     cookieCount.style.color = count > 0 ? '#2ecc71' : '#e74c3c';
     
     // Update button states
@@ -370,102 +787,44 @@ function addSampleCookie() {
     }
 }
 
-// ============================================
-// CONTROL FUNCTIONS
-// ============================================
-async function startChecking() {
-    const cookies = parseCookies(cookiesInput.value);
-    
-    if (cookies.length === 0) {
-        showToast('Masukkan cookies terlebih dahulu!', 'error');
-        return;
-    }
-    
-    if (cookies.length > 100) {
-        if (!confirm(`Anda akan check ${cookies.length} cookies. Ini mungkin butuh waktu lama. Lanjutkan?`)) {
-            return;
-        }
-    }
-    
-    if (!apiConnected) {
-        showToast('API tidak terhubung. Tidak dapat memulai checking.', 'error');
-        return;
-    }
-    
-    try {
-        showToast(`Memulai checking ${cookies.length} cookies...`, 'info');
-        
-        const response = await fetch(`${API_BASE_URL}/api/check`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'start',
-                cookies: cookies
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            isChecking = true;
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-            progressSection.style.display = 'block';
-            showToast(`Checking dimulai! ${data.total} cookies`, 'success');
-            
-            // Update user stats
-            const currentChecks = parseInt(userData.total_checks || 0) + 1;
-            const currentCookies = parseInt(userData.total_cookies || 0) + cookies.length;
-            userData.total_checks = currentChecks;
-            userData.total_cookies = currentCookies;
-            localStorage.setItem('user_total_checks', currentChecks);
-            localStorage.setItem('user_total_cookies', currentCookies);
-            updateUserInfo();
-        } else {
-            showToast(data.error || 'Gagal memulai checking', 'error');
-        }
-    } catch (error) {
-        console.error('Start checking error:', error);
-        showToast('Error: ' + error.message, 'error');
+function formatTime(seconds) {
+    if (seconds < 60) {
+        return `${Math.round(seconds)} detik`;
+    } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.round(seconds % 60);
+        return `${minutes}m ${secs}s`;
+    } else {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.round((seconds % 3600) / 60);
+        return `${hours}h ${minutes}m`;
     }
 }
 
-async function stopChecking() {
-    if (!isChecking) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/check`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'stop' })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            isChecking = false;
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            showToast('Checking dihentikan!', 'warning');
-        }
-    } catch (error) {
-        showToast('Error menghentikan checking: ' + error.message, 'error');
-    }
+function updateUserStatsAfterStart(cookiesCount) {
+    const currentChecks = parseInt(userData.total_checks || 0) + 1;
+    const currentCookies = parseInt(userData.total_cookies || 0) + cookiesCount;
+    userData.total_checks = currentChecks;
+    userData.total_cookies = currentCookies;
+    localStorage.setItem('user_total_checks', currentChecks);
+    localStorage.setItem('user_total_cookies', currentCookies);
+    updateUserInfo();
 }
+
+// ============================================
+// EXISTING FUNCTIONS (updated)
+// ============================================
 
 async function testSingleCookie() {
     const cookies = parseCookies(cookiesInput.value);
+    const { validCookies } = validateCookies(cookies);
     
-    if (cookies.length === 0) {
-        showToast('Masukkan cookie terlebih dahulu!', 'error');
+    if (validCookies.length === 0) {
+        showToast('Masukkan cookie valid terlebih dahulu!', 'error');
         return;
     }
     
-    const cookie = cookies[0];
+    const cookie = validCookies[0];
     
     try {
         showToast('Testing cookie...', 'info');
@@ -493,13 +852,7 @@ async function testSingleCookie() {
         updateStatsFromResult(result);
         
         // Update user stats
-        const currentChecks = parseInt(userData.total_checks || 0) + 1;
-        const currentCookies = parseInt(userData.total_cookies || 0) + 1;
-        userData.total_checks = currentChecks;
-        userData.total_cookies = currentCookies;
-        localStorage.setItem('user_total_checks', currentChecks);
-        localStorage.setItem('user_total_cookies', currentCookies);
-        updateUserInfo();
+        updateUserStatsAfterStart(1);
         
         showToast(`Test selesai: ${result.status}`, 
             result.status === 'valid' ? 'success' : 'error');
@@ -539,6 +892,10 @@ async function clearResults() {
             logsList.innerHTML = '';
             validList.innerHTML = '';
             
+            // Hide batch info
+            batchInfo.style.display = 'none';
+            currentBatchId = null;
+            
             showToast('Semua hasil dibersihkan!', 'info');
         }
     } catch (error) {
@@ -546,48 +903,34 @@ async function clearResults() {
     }
 }
 
-async function exportValidCookies() {
+// ============================================
+// API CONNECTION & STATUS
+// ============================================
+
+async function checkApiConnection() {
     try {
         const response = await fetch(`${API_BASE_URL}/api/check`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'export' })
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
         });
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // Create download
-            const blob = new Blob([data.export_data], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = data.filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            showToast(`File diexport: ${data.filename}`, 'success');
+        if (response.ok) {
+            apiConnected = true;
+            apiStatusIcon.className = 'fas fa-wifi';
+            apiStatusText.textContent = 'API Connected';
+            apiStatusIcon.style.color = '#2ecc71';
+        } else {
+            throw new Error('API not responding');
         }
     } catch (error) {
-        console.error('Export error:', error);
-        showToast('Error mengexport: ' + error.message, 'error');
+        apiConnected = false;
+        apiStatusIcon.className = 'fas fa-wifi-slash';
+        apiStatusText.textContent = 'API Disconnected';
+        apiStatusIcon.style.color = '#e74c3c';
+        showToast('API tidak terhubung. Periksa koneksi.', 'error');
     }
 }
 
-async function exportAllValidCookies() {
-    // Similar to exportValidCookies but for all valid accounts
-    await exportValidCookies();
-}
-
-// ============================================
-// STATUS & PROGRESS UPDATES
-// ============================================
 async function updateStatus() {
     try {
         const response = await fetch(`${API_BASE_URL}/api/check`);
@@ -603,24 +946,9 @@ async function updateStatus() {
         startBtn.disabled = isChecking;
         stopBtn.disabled = !isChecking;
         
-        // Update progress if running
         if (status.status === 'running' && status.stats) {
-            progressSection.style.display = 'block';
-            progressFill.style.width = `${status.stats.progress}%`;
-            progressPercent.textContent = `${status.stats.progress}%`;
-            progressText.textContent = 
-                `Checking ${status.stats.current} dari ${status.stats.total} cookies`;
-            
-            // Update stats
-            validCount.textContent = status.stats.valid;
-            invalidCount.textContent = status.stats.invalid;
-            totalRobux.textContent = status.stats.robux.toLocaleString();
-            premiumCount.textContent = status.stats.premium;
-            
-            // Auto-refetch results
-            fetchResults();
-        } else if (status.status === 'completed' || status.status === 'stopped') {
-            progressSection.style.display = 'none';
+            // Update concurrent checks display
+            concurrentChecksElement.textContent = status.stats.speed ? Math.round(status.stats.speed * 2) : '3';
         }
         
     } catch (error) {
@@ -631,6 +959,7 @@ async function updateStatus() {
 // ============================================
 // RESULTS MANAGEMENT
 // ============================================
+
 async function fetchResults() {
     try {
         const response = await fetch(`${API_BASE_URL}/api/check?action=results`);
@@ -663,8 +992,8 @@ function updateResultsTable(results) {
     // Clear existing rows
     resultsBody.innerHTML = '';
     
-    // Add new rows (limit to 50)
-    results.slice(0, 50).forEach(result => {
+    // Add new rows (limit to 100)
+    results.slice(0, 100).forEach(result => {
         addResultToTable(result);
     });
 }
@@ -700,10 +1029,13 @@ function addResultToTable(result) {
             row.style.borderLeft = '4px solid #f39c12';
     }
     
+    // Batch ID if available
+    const batchInfo = result.batch_id ? `<br><small class="batch-id">Batch: ${result.batch_id}</small>` : '';
+    
     row.innerHTML = `
         <td>${result.cookie_id + 1}</td>
         <td>${statusBadge}</td>
-        <td><strong>${result.username}</strong></td>
+        <td><strong>${result.username}</strong>${batchInfo}</td>
         <td>${result.display_name || result.username}</td>
         <td class="robux-cell">${(result.robux || 0).toLocaleString()}</td>
         <td>${result.premium ? '<i class="fas fa-crown premium-icon"></i>' : '-'}</td>
@@ -724,9 +1056,9 @@ function addResultToTable(result) {
         row.style.transform = 'translateY(0)';
     }, 10);
     
-    // Limit rows to 50
+    // Limit rows to 100
     const rows = resultsBody.querySelectorAll('tr');
-    if (rows.length > 50) {
+    if (rows.length > 100) {
         rows[rows.length - 1].remove();
     }
 }
@@ -764,6 +1096,7 @@ function updateStatsFromResults(results) {
 // ============================================
 // LOGS & VALID ACCOUNTS
 // ============================================
+
 async function fetchLogs() {
     try {
         const response = await fetch(`${API_BASE_URL}/api/check?action=logs`);
@@ -821,6 +1154,7 @@ function updateLogsList(logs) {
                 ${log.robux ? `<span>Robux: ${log.robux.toLocaleString()}</span>` : ''}
                 ${log.premium ? '<span>Premium: Yes</span>' : ''}
                 ${log.error ? `<span>Error: ${log.error}</span>` : ''}
+                ${log.batch_id ? `<span>Batch: ${log.batch_id}</span>` : ''}
             </div>
         `;
         
@@ -851,6 +1185,7 @@ function updateValidAccountsList(validCookies) {
                 <div class="valid-account-name">
                     <h4>${account.username}</h4>
                     <p>${account.display_name}</p>
+                    ${account.batch_id ? `<small>Batch: ${account.batch_id}</small>` : ''}
                 </div>
                 <div class="valid-account-robux">
                     ${account.robux.toLocaleString()} Robux
@@ -883,6 +1218,7 @@ function updateValidAccountsList(validCookies) {
 // ============================================
 // TAB MANAGEMENT
 // ============================================
+
 function switchTab(tabId) {
     // Update active tab button
     tabButtons.forEach(button => {
@@ -909,8 +1245,49 @@ function switchTab(tabId) {
 }
 
 // ============================================
+// BATCH MANAGEMENT
+// ============================================
+
+async function checkExistingBatch() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/check`);
+        
+        if (response.ok) {
+            const status = await response.json();
+            
+            if (status.is_checking && status.batch_id) {
+                // Join existing batch
+                currentBatchId = status.batch_id;
+                isChecking = true;
+                
+                // Update UI
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                progressSection.style.display = 'block';
+                batchInfo.style.display = 'block';
+                pauseResumeBtn.style.display = 'flex';
+                
+                // Update batch info
+                batchIdElement.textContent = currentBatchId;
+                pauseResumeBtn.innerHTML = status.status === 'paused' 
+                    ? '<i class="fas fa-play"></i> Resume'
+                    : '<i class="fas fa-pause"></i> Pause';
+                
+                // Start monitoring
+                startBatchMonitoring();
+                
+                showToast(`Bergabung dengan batch yang sedang berjalan: ${currentBatchId}`, 'info');
+            }
+        }
+    } catch (error) {
+        console.error('Check existing batch error:', error);
+    }
+}
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
+
 function updateCurrentTime() {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('id-ID', {
@@ -964,6 +1341,7 @@ function hideToast() {
 // ============================================
 // INITIALIZATION
 // ============================================
+
 document.addEventListener('DOMContentLoaded', async function() {
     // Check if user is already logged in
     const isLoggedIn = await verifyToken();
@@ -972,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Auto login
         loginSection.style.display = 'none';
         dashboardSection.style.display = 'block';
-        await initDashboard();
+        await initDashboardOptimized();
     } else {
         // Show login
         loginSection.style.display = 'flex';
@@ -992,3 +1370,138 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }, 1000);
 });
+
+// ============================================
+// ADD CSS FOR BATCH INFO
+// ============================================
+
+const batchStyles = `
+<style>
+.batch-info {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+    border: 1px solid rgba(76, 201, 240, 0.3);
+    display: none;
+}
+
+.batch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.batch-header h4 {
+    color: #4cc9f0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+}
+
+.batch-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn-batch-export {
+    padding: 8px 16px;
+    background: rgba(155, 89, 182, 0.2);
+    border: 1px solid rgba(155, 89, 182, 0.3);
+    border-radius: 8px;
+    color: #9b59b6;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-batch-export:hover {
+    background: rgba(155, 89, 182, 0.3);
+}
+
+.btn-pause-resume {
+    padding: 8px 16px;
+    background: rgba(243, 156, 18, 0.2);
+    border: 1px solid rgba(243, 156, 18, 0.3);
+    border-radius: 8px;
+    color: #f39c12;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-pause-resume:hover {
+    background: rgba(243, 156, 18, 0.3);
+}
+
+.batch-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.batch-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.batch-stat-label {
+    color: #b0b0b0;
+    font-size: 14px;
+}
+
+.batch-stat-value {
+    font-weight: 600;
+    color: #4cc9f0;
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+}
+
+.batch-progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.progress-detail {
+    color: #b0b0b0;
+}
+
+.progress-detail span:last-child {
+    color: #4cc9f0;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.batch-id {
+    color: #9b59b6;
+    font-size: 11px;
+    display: block;
+    margin-top: 2px;
+}
+</style>
+`;
+
+// Inject styles
+document.head.insertAdjacentHTML('beforeend', batchStyles);
