@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robin Cookie Checker - Admin Login</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👑</text></svg>">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Admin Login -->
+        <div id="adminLogin" class="admin-login-container">
+            <div class="admin-login-box">
+                <div class="admin-logo">
+                    <i class="fas fa-crown"></i>
+                    <h1>Admin Panel</h1>
+                    <p class="tagline">Robin Cookie Checker Management</p>
+                </div>
+                
+                <div class="admin-login-form">
+                    <div class="form-group">
+                        <label for="adminUsername">
+                            <i class="fas fa-user-shield"></i> Admin Username
+                        </label>
+                        <input type="text" id="adminUsername" value="admin" readonly>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="adminPassword">
+                            <i class="fas fa-key"></i> Admin Password
+                        </label>
+                        <input type="password" id="adminPassword" placeholder="Masukkan password admin">
+                    </div>
+                    
+                    <button id="adminLoginBtn" class="btn-admin-login">
+                        <i class="fas fa-sign-in-alt"></i> Login as Admin
+                    </button>
+                    
+                    <div class="admin-note">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Hanya untuk administrator sistem. Akses tidak terbatas ke semua fitur.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="adminDashboard" class="admin-dashboard" style="display: none;">
+            <!-- Admin Header -->
+            <header class="admin-header">
+                <div class="admin-header-left">
+                    <h1><i class="fas fa-crown"></i> Admin Control Panel</h1>
+                    <p class="subtitle">Robin Cookie Checker Management System</p>
+                </div>
+                <div class="admin-header-right">
+                    <div class="admin-status">
+                        <i class="fas fa-server"></i>
+                        <span>System Online</span>
+                    </div>
+                    <button id="adminLogoutBtn" class="btn-admin-logout">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </header>
+
+            <!-- Admin Stats -->
+            <div class="admin-stats-grid">
+                <div class="admin-stat-card">
+                    <div class="admin-stat-icon" style="background: linear-gradient(135deg, #3498db, #2980b9);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="admin-stat-info">
+                        <h3 id="totalUsers">0</h3>
+                        <p>Total Users</p>
+                        <small id="activeUsers">0 Active</small>
+                    </div>
+                </div>
+                
+                <div class="admin-stat-card">
+                    <div class="admin-stat-icon" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                        <i class="fas fa-sign-in-alt"></i>
+                    </div>
+                    <div class="admin-stat-info">
+                        <h3 id="totalLogins">0</h3>
+                        <p>Total Logins</p>
+                        <small id="todayLogins">0 Today</small>
+                    </div>
+                </div>
+                
+                <div class="admin-stat-card">
+                    <div class="admin-stat-icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                        <i class="fas fa-cookie-bite"></i>
+                    </div>
+                    <div class="admin-stat-info">
+                        <h3 id="totalChecks">0</h3>
+                        <p>Total Checks</p>
+                        <small id="totalCookies">0 Cookies</small>
+                    </div>
+                </div>
+                
+                <div class="admin-stat-card">
+                    <div class="admin-stat-icon" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                        <i class="fas fa-user-slash"></i>
+                    </div>
+                    <div class="admin-stat-info">
+                        <h3 id="expiredUsers">0</h3>
+                        <p>Expired Users</p>
+                        <small>Require Extension</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Tabs -->
+            <div class="admin-tabs">
+                <div class="admin-tab-buttons">
+                    <button class="admin-tab-btn active" data-tab="users">User Management</button>
+                    <button class="admin-tab-btn" data-tab="create">Create User</button>
+                    <button class="admin-tab-btn" data-tab="bulk">Bulk Create</button>
+                    <button class="admin-tab-btn" data-tab="settings">Settings</button>
+                </div>
+
+                <!-- Users Tab -->
+                <div class="admin-tab-content active" id="users-tab">
+                    <div class="admin-table-container">
+                        <div class="table-header">
+                            <h3><i class="fas fa-user-friends"></i> User Accounts</h3>
+                            <div class="table-actions">
+                                <input type="text" id="searchUsers" placeholder="Search users...">
+                                <button id="refreshUsers" class="btn-refresh">
+                                    <i class="fas fa-redo"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Expires</th>
+                                    <th>Days Left</th>
+                                    <th>Logins</th>
+                                    <th>Checks</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- Users will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Create User Tab -->
+                <div class="admin-tab-content" id="create-tab">
+                    <div class="create-user-form">
+                        <h3><i class="fas fa-user-plus"></i> Create New User</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="newUsername">
+                                    <i class="fas fa-user"></i> Username
+                                </label>
+                                <input type="text" id="newUsername" placeholder="Enter username">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="newPassword">
+                                    <i class="fas fa-key"></i> Password
+                                </label>
+                                <input type="password" id="newPassword" placeholder="Enter password">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="subscriptionDays">
+                                <i class="fas fa-calendar-alt"></i> Subscription Duration
+                            </label>
+                            <div class="duration-buttons">
+                                <button class="duration-btn" data-days="1">1 Day</button>
+                                <button class="duration-btn" data-days="7">7 Days</button>
+                                <button class="duration-btn active" data-days="30">30 Days</button>
+                                <button class="duration-btn" data-days="90">90 Days</button>
+                                <button class="duration-btn" data-days="180">180 Days</button>
+                                <button class="duration-btn" data-days="365">365 Days</button>
+                            </div>
+                            <input type="number" id="customDays" min="1" max="999" value="30" placeholder="Custom days">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="userNotes">
+                                <i class="fas fa-sticky-note"></i> Notes (Optional)
+                            </label>
+                            <textarea id="userNotes" rows="3" placeholder="Notes about this user..."></textarea>
+                        </div>
+                        
+                        <button id="createUserBtn" class="btn-create-user">
+                            <i class="fas fa-user-plus"></i> Create User Account
+                        </button>
+                        
+                        <div class="user-preview" id="userPreview">
+                            <h4><i class="fas fa-eye"></i> Account Preview</h4>
+                            <div class="preview-info">
+                                <p><strong>Username:</strong> <span id="previewUsername">-</span></p>
+                                <p><strong>Duration:</strong> <span id="previewDuration">30 days</span></p>
+                                <p><strong>Expires:</strong> <span id="previewExpiry">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bulk Create Tab -->
+                <div class="admin-tab-content" id="bulk-tab">
+                    <div class="bulk-create-form">
+                        <h3><i class="fas fa-users"></i> Bulk Create Users</h3>
+                        
+                        <div class="form-group">
+                            <label for="bulkUsers">
+                                <i class="fas fa-list"></i> User List (Format: username:password)
+                            </label>
+                            <textarea id="bulkUsers" rows="10" placeholder="Format:
+username1:password123
+username2:password456
+username3:password789
+
+Each line should contain username and password separated by colon (:)."></textarea>
+                            <div class="input-info">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Enter one user per line. Username and password separated by colon.</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="bulkDays">
+                                <i class="fas fa-calendar-alt"></i> Duration for All Users
+                            </label>
+                            <input type="number" id="bulkDays" min="1" max="999" value="30" placeholder="Days">
+                        </div>
+                        
+                        <button id="bulkCreateBtn" class="btn-bulk-create">
+                            <i class="fas fa-users"></i> Create Multiple Users
+                        </button>
+                        
+                        <div class="bulk-results" id="bulkResults" style="display: none;">
+                            <h4><i class="fas fa-clipboard-check"></i> Creation Results</h4>
+                            <div class="results-container">
+                                <div class="success-results">
+                                    <h5><i class="fas fa-check-circle"></i> Successful (<span id="successCount">0</span>)</h5>
+                                    <div id="successList"></div>
+                                </div>
+                                <div class="failed-results">
+                                    <h5><i class="fas fa-times-circle"></i> Failed (<span id="failedCount">0</span>)</h5>
+                                    <div id="failedList"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div class="admin-tab-content" id="settings-tab">
+                    <div class="admin-settings">
+                        <h3><i class="fas fa-cog"></i> System Settings</h3>
+                        
+                        <div class="settings-section">
+                            <h4><i class="fas fa-key"></i> Admin Password</h4>
+                            <div class="form-group">
+                                <label for="currentPassword">Current Password</label>
+                                <input type="password" id="currentPassword" placeholder="Current admin password">
+                            </div>
+                            <div class="form-group">
+                                <label for="newAdminPassword">New Password</label>
+                                <input type="password" id="newAdminPassword" placeholder="New admin password">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmAdminPassword">Confirm New Password</label>
+                                <input type="password" id="confirmAdminPassword" placeholder="Confirm new password">
+                            </div>
+                            <button id="updateAdminPasswordBtn" class="btn-update-password">
+                                <i class="fas fa-save"></i> Update Admin Password
+                            </button>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4><i class="fas fa-database"></i> System Information</h4>
+                            <div class="system-info">
+                                <p><strong>Server Time:</strong> <span id="serverTime">Loading...</span></p>
+                                <p><strong>Total Users:</strong> <span id="systemTotalUsers">0</span></p>
+                                <p><strong>Active Sessions:</strong> <span id="activeSessions">0</span></p>
+                                <p><strong>API Status:</strong> <span class="status-online">Online</span></p>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4><i class="fas fa-trash"></i> Maintenance</h4>
+                            <div class="maintenance-actions">
+                                <button id="clearExpiredBtn" class="btn-maintenance">
+                                    <i class="fas fa-user-slash"></i> Deactivate Expired Users
+                                </button>
+                                <button id="clearSessionsBtn" class="btn-maintenance">
+                                    <i class="fas fa-broom"></i> Clear Old Sessions
+                                </button>
+                                <button id="refreshStatsBtn" class="btn-maintenance">
+                                    <i class="fas fa-sync-alt"></i> Refresh Statistics
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="admin-footer">
+                <div class="footer-content">
+                    <p>
+                        <i class="fas fa-code"></i> 
+                        Robin Cookie Checker Admin v3.0 • 
+                        <span id="adminCurrentTime">Loading...</span>
+                    </p>
+                    <p class="footer-note">
+                        <i class="fas fa-shield-alt"></i> 
+                        Admin Panel - Restricted Access Only
+                    </p>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="adminToast" class="toast">
+        <div class="toast-content">
+            <i class="fas fa-info-circle" id="adminToastIcon"></i>
+            <span id="adminToastMessage">Notification message</span>
+        </div>
+        <button id="adminToastClose" class="toast-close">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <!-- User Actions Modal -->
+    <div id="userActionsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-cog"></i> User Actions</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="user-info-modal" id="userInfoModal">
+                    <!-- User info will be inserted here -->
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn-action extend-btn" data-action="extend">
+                        <i class="fas fa-calendar-plus"></i> Extend Subscription
+                    </button>
+                    <button class="btn-action deactivate-btn" data-action="deactivate">
+                        <i class="fas fa-user-slash"></i> Deactivate User
+                    </button>
+                    <button class="btn-action activate-btn" data-action="activate">
+                        <i class="fas fa-user-check"></i> Activate User
+                    </button>
+                    <button class="btn-action delete-btn" data-action="delete">
+                        <i class="fas fa-trash"></i> Delete User
+                    </button>
+                </div>
+                
+                <div class="extend-form" id="extendForm" style="display: none;">
+                    <h4><i class="fas fa-calendar-plus"></i> Extend Subscription</h4>
+                    <div class="form-group">
+                        <label for="extendDays">Additional Days</label>
+                        <input type="number" id="extendDays" min="1" max="999" value="30">
+                    </div>
+                    <button id="confirmExtendBtn" class="btn-confirm-extend">
+                        <i class="fas fa-check"></i> Confirm Extension
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robin Cookie Checker - User Login</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔐</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <!-- Login Section -->
+        <div id="loginSection" class="login-container">
+            <div class="login-box">
+                <div class="logo">
+                    <i class="fas fa-shield-alt"></i>
+                    <h1>Robin Cookie Checker</h1>
+                    <p class="tagline">Professional Roblox Account Checker</p>
+                </div>
+                
+                <div class="login-form">
+                    <div class="form-group">
+                        <label for="username">
+                            <i class="fas fa-user"></i> Username
+                        </label>
+                        <input type="text" id="username" placeholder="Masukkan username">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">
+                            <i class="fas fa-key"></i> Password
+                        </label>
+                        <input type="password" id="password" placeholder="Masukkan password">
+                    </div>
+                    
+                    <button id="loginBtn" class="btn-login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                    
+                    <div class="login-footer">
+                        <p><i class="fas fa-info-circle"></i> Hubungi admin untuk mendapatkan akses</p>
+                        <p><i class="fas fa-clock"></i> Akses tersedia sesuai durasi yang ditentukan</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard User -->
+        <div id="dashboardSection" class="dashboard-container" style="display: none;">
+            <!-- Header -->
+            <header class="dashboard-header">
+                <div class="header-left">
+                    <h1><i class="fas fa-cookie-bite"></i> Robin Cookie Checker Pro</h1>
+                    <p class="subtitle">User Dashboard</p>
+                </div>
+                <div class="header-right">
+                    <div class="user-info">
+                        <i class="fas fa-user"></i>
+                        <div class="user-details">
+                            <span id="userName">Loading...</span>
+                            <small id="userExpiry">Expires: Loading...</small>
+                        </div>
+                    </div>
+                    <button id="logoutBtn" class="btn-logout">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </header>
+
+            <!-- User Info Card -->
+            <div class="user-info-card">
+                <div class="user-stats">
+                    <div class="stat-item">
+                        <i class="fas fa-clock"></i>
+                        <div>
+                            <h3 id="daysLeft">0</h3>
+                            <p>Days Left</p>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <div>
+                            <h3 id="loginCount">0</h3>
+                            <p>Total Logins</p>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-cookie"></i>
+                        <div>
+                            <h3 id="totalChecks">0</h3>
+                            <p>Total Checks</p>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <h3 id="totalCookies">0</h3>
+                            <p>Cookies Checked</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Stats -->
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="validCount">0</h3>
+                        <p>Valid Cookies</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="invalidCount">0</h3>
+                        <p>Invalid Cookies</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f39c12, #d35400);">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalRobux">0</h3>
+                        <p>Total Robux</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="premiumCount">0</h3>
+                        <p>Premium Accounts</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-gamepad"></i> Control Panel</h2>
+                    <div class="api-status">
+                        <i class="fas fa-wifi" id="apiStatusIcon"></i>
+                        <span id="apiStatusText">API Connected</span>
+                    </div>
+                </div>
+                
+                <div class="panel-body">
+                    <!-- Cookie Input -->
+                    <div class="input-section">
+                        <div class="input-header">
+                            <label for="cookiesInput">
+                                <i class="fas fa-cookie"></i> Roblox Cookies (satu per baris)
+                            </label>
+                            <button id="sampleBtn" class="btn-sample">
+                                <i class="fas fa-vial"></i> Sample Cookie
+                            </button>
+                        </div>
+                        <textarea id="cookiesInput" rows="8" placeholder="Paste cookies di sini, satu per baris:
+_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_cookie1
+_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_cookie2
+_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_cookie3"></textarea>
+                        <div class="input-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span id="cookieCount">0 cookies ditemukan</span>
+                            <span class="hint">Format: _|WARNING:-DO-NOT-SHARE-THIS...|_</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress-section" id="progressSection" style="display: none;">
+                        <div class="progress-header">
+                            <span>Progress Checking</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-info">
+                            <i class="fas fa-sync-alt fa-spin"></i>
+                            <span id="progressText">Menyiapkan...</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Control Buttons -->
+                    <div class="button-group">
+                        <button id="startBtn" class="btn-start">
+                            <i class="fas fa-play"></i> Start Checking
+                        </button>
+                        <button id="stopBtn" class="btn-stop" disabled>
+                            <i class="fas fa-stop"></i> Stop Checking
+                        </button>
+                        <button id="testBtn" class="btn-test">
+                            <i class="fas fa-vial"></i> Test Single Cookie
+                        </button>
+                        <button id="clearBtn" class="btn-clear">
+                            <i class="fas fa-trash"></i> Clear Results
+                        </button>
+                        <button id="exportBtn" class="btn-export">
+                            <i class="fas fa-download"></i> Export Valid
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results & Logs -->
+            <div class="tabs-container">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="results">Results</button>
+                    <button class="tab-btn" data-tab="logs">Logs & Stats</button>
+                    <button class="tab-btn" data-tab="valid">Valid Accounts</button>
+                </div>
+                
+                <!-- Results Tab -->
+                <div class="tab-content active" id="results-tab">
+                    <div class="table-container">
+                        <table id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Status</th>
+                                    <th>Username</th>
+                                    <th>Display Name</th>
+                                    <th>Robux</th>
+                                    <th>Premium</th>
+                                    <th>Friends</th>
+                                    <th>Error</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsBody">
+                                <!-- Results will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="no-results" id="noResults">
+                        <i class="fas fa-inbox"></i>
+                        <p>Belum ada hasil. Mulai checking untuk melihat hasil live!</p>
+                    </div>
+                </div>
+                
+                <!-- Logs Tab -->
+                <div class="tab-content" id="logs-tab">
+                    <div class="logs-container">
+                        <div class="logs-header">
+                            <h3><i class="fas fa-history"></i> Checking Logs</h3>
+                            <button id="refreshLogs" class="btn-refresh">
+                                <i class="fas fa-redo"></i> Refresh Logs
+                            </button>
+                        </div>
+                        <div class="logs-stats">
+                            <div class="log-stat">
+                                <span class="log-stat-label">Total Checks:</span>
+                                <span class="log-stat-value" id="totalChecksLog">0</span>
+                            </div>
+                            <div class="log-stat">
+                                <span class="log-stat-label">Valid Cookies:</span>
+                                <span class="log-stat-value" id="validCookiesLog">0</span>
+                            </div>
+                            <div class="log-stat">
+                                <span class="log-stat-label">Invalid Cookies:</span>
+                                <span class="log-stat-value" id="invalidCookiesLog">0</span>
+                            </div>
+                            <div class="log-stat">
+                                <span class="log-stat-label">Total Robux:</span>
+                                <span class="log-stat-value" id="totalRobuxLog">0</span>
+                            </div>
+                        </div>
+                        <div class="logs-list" id="logsList">
+                            <!-- Logs will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Valid Accounts Tab -->
+                <div class="tab-content" id="valid-tab">
+                    <div class="valid-container">
+                        <div class="valid-header">
+                            <h3><i class="fas fa-check-circle"></i> Valid Accounts Found</h3>
+                            <button id="exportValidBtn" class="btn-export">
+                                <i class="fas fa-file-export"></i> Export All
+                            </button>
+                        </div>
+                        <div class="valid-list" id="validList">
+                            <!-- Valid accounts will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <footer class="dashboard-footer">
+                <div class="footer-content">
+                    <p>
+                        <i class="fas fa-code"></i> 
+                        Robin Cookie Checker Pro v3.0 • User Dashboard • 
+                        <span id="currentTime">Loading...</span>
+                    </p>
+                    <p class="footer-note">
+                        <i class="fas fa-shield-alt"></i> 
+                        Semua proses berjalan di backend yang aman. Cookies tidak disimpan di browser.
+                    </p>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <i class="fas fa-info-circle" id="toastIcon"></i>
+            <span id="toastMessage">Notification message</span>
+        </div>
+        <button id="toastClose" class="toast-close">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
